@@ -2,7 +2,7 @@ import type { MusicPlayerConfig } from "../types/config";
 
 export const musicPlayerConfig: MusicPlayerConfig = {
 	showInNavbar: true,
-	mode: "local",
+	mode: "meting",
 	volume: 0.7,
 	playMode: "list",
 	showLyrics: true,
