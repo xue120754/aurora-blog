@@ -113,10 +113,16 @@ const workAvatarUrls = await Promise.all(
 	),
 );
 
-const offAvatarSources = ["assets/images/aurora-avatar.jpg"];
-const offAvatarUrls = (
-	await Promise.all(offAvatarSources.map(async (src) => resolveHeroImage(src)))
-).filter((src): src is string => Boolean(src));
+// 下班状态也用同一组「会动的头像池」：原来这里写死成一张静态头像，
+// 导致一进入下班时段动图就消失、回退成配置里的静态头像。
+const offAvatarUrls =
+	workAvatarUrls.length > 0
+		? workAvatarUrls
+		: (
+				await Promise.all(
+					["assets/images/aurora-avatar.jpg"].map(async (src) => resolveHeroImage(src)),
+				)
+			).filter((src): src is string => Boolean(src));
 
 const avatarUrl = workAvatarUrls[0] ?? offAvatarUrls[0] ?? "";
 const avatarOffUrl = offAvatarUrls[0] ?? offAvatarUrls[1] ?? avatarUrl;
