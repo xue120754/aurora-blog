@@ -1141,14 +1141,20 @@
 @media (min-width: 80rem) and (max-width: 101rem) and (hover: hover) and (pointer: fine) {
 	.article-toc-panel {
 		left: auto;
-		right: 0.75rem;
-		--article-toc-surface-width: 15rem;
+		right: 1.25rem;
+		--article-toc-surface-width: 13rem;
 	}
 }
 
 @media (min-width: 80rem) and (max-width: 101rem) {
 	/* 只影响带目录的文章页，不动首页与列表页 */
 	body:has(.article-toc-panel) {
-		--page-width: 46rem;
+		--page-width: 40rem;
+	}
+}
+/* 右缘兜底：任何宽度下目录面板都不越出视口右边界 */
+@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
+	.article-toc-panel {
+		left: min(calc(50% + 31.5rem + var(--space-4)), calc(100% - var(--article-toc-surface-width) - 1.25rem));
 	}
 }
