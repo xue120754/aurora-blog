@@ -11,7 +11,7 @@ backend:
   repo: xue120754/aurora-blog
   branch: main
   # Cloudflare Worker 提供的 GitHub OAuth 中转（见 decap-oauth worker）
-  base_url: https://decap-oauth.你的子域.workers.dev
+  base_url: https://decap-oauth.snow1207-2025.workers.dev
   auth_endpoint: auth
   commit_messages:
     create: "cms: 新建「{{slug}}」"
