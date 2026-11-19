@@ -26,6 +26,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -38,9 +40,11 @@ jobs:
           PUBLIC_AMAP_KEY_PLACES: 0b8c9bdb63f354286c9dd85a37269f0c
           PUBLIC_AMAP_SECURITY_CODE: 0ef5af6651113a8d9c95c91a4c9f24c6
 
+      # 不用 wrangler-action：它会在仓库内安装 wrangler，
+      # 触发 package.json 里的 preinstall only-allow pnpm 而失败。
+      # 直接用 npx 跑，绕开项目依赖约束。
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=aurora-blog --branch=main
+        run: npx --yes wrangler@4 pages deploy dist --project-name=aurora-blog --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
