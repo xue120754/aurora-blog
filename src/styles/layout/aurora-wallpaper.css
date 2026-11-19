@@ -1,0 +1,87 @@
+/* ==========================================================================
+   Aurora 全站壁纸层
+   - 独立于旧 #wallpaper-wrapper，避免与 swup / 滚动逻辑冲突
+   - 非首页显示；首页背景由 HomeHero 自己的图片承担，同样跟随 data-wallpaper-mode
+   ========================================================================== */
+
+#aurora-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--wallpaper-opacity, 0.55);
+  transition: opacity 0.3s ease;
+  background: var(--page-bg);
+}
+
+#aurora-wallpaper picture,
+#aurora-wallpaper img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#aurora-wallpaper img {
+  object-fit: cover;
+  transform-origin: center center;
+  will-change: transform;
+  transition: opacity 0.4s ease;
+}
+
+/* 可读性遮罩：亮色压白、暗色压黑 */
+#aurora-wallpaper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.62) 55%,
+    rgba(255, 255, 255, 0.78) 100%
+  );
+}
+
+html.dark #aurora-wallpaper::after {
+  background: linear-gradient(
+    180deg,
+    rgba(8, 8, 10, 0.5) 0%,
+    rgba(8, 8, 10, 0.7) 55%,
+    rgba(8, 8, 10, 0.82) 100%
+  );
+}
+
+/* 动态壁纸：缓慢的 Ken Burns */
+html[data-wallpaper-mode="dynamic"] #aurora-wallpaper img {
+  animation: aurora-wallpaper-kenburns var(--wallpaper-duration, 40s)
+    ease-in-out infinite alternate;
+}
+
+@keyframes aurora-wallpaper-kenburns {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(var(--wallpaper-zoom, 1.12)) translate3d(-1.5%, -1%, 0);
+  }
+}
+
+/* 首页 Hero 背景同步动效 */
+html[data-wallpaper-mode="dynamic"] .home-hero__video {
+  animation: aurora-wallpaper-kenburns var(--wallpaper-duration, 40s)
+    ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-wallpaper-mode="dynamic"] #aurora-wallpaper img,
+  html[data-wallpaper-mode="dynamic"] .home-hero__video {
+    animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  #aurora-wallpaper {
+    opacity: calc(var(--wallpaper-opacity, 0.55) * 0.85);
+  }
+}

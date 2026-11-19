@@ -1,0 +1,1726 @@
+---
+import * as path from "node:path";
+import { getCollection } from "astro:content";
+import type { ImageMetadata } from "astro";
+import { Icon } from "astro-icon/components";
+import PageTitle from "@/components/common/PageTitle.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import { isPublicPost } from "@/utils/content-utils";
+import { getFileDirFromPath, getPostUrlBySlug, url } from "@/utils/url-utils";
+
+// 学习日志：本地编辑器使用 IndexedDB；公开构建只读取已发布的 Markdown。
+const publicDateFormatter = new Intl.DateTimeFormat("zh-CN", {
+	year: "numeric",
+	month: "2-digit",
+	day: "2-digit",
+});
+const studyImageFiles = import.meta.glob<ImageMetadata>(
+	"../../content/**/*.{png,jpg,jpeg,webp,avif}",
+	{ import: "default" },
+);
+const publicLogs = import.meta.env.DEV
+	? []
+	: await Promise.all(
+			(
+				await getCollection(
+					"posts",
+					({ id, data }) =>
+						isPublicPost(data) &&
+						(id.startsWith("学习日志/") || data.tags.includes("学习日志")),
+				)
+			)
+				.sort((a, b) => b.data.published.getTime() - a.data.published.getTime())
+				.map(async (entry) => {
+					let cover = entry.data.image;
+					if (cover && !/^(https?:\/\/|\/|data:)/i.test(cover)) {
+						const basePath = getFileDirFromPath(entry.filePath || "");
+						const normalizedPath = path
+							.normalize(path.join("../../content/", basePath, cover))
+							.replace(/\\/g, "/");
+						const loadImage = studyImageFiles[normalizedPath];
+						cover = loadImage ? (await loadImage()).src : "";
+					} else if (cover.startsWith("/")) {
+						cover = url(cover);
+					}
+					return {
+						entry,
+						cover,
+						href: getPostUrlBySlug(entry.id),
+					};
+				}),
+		);
+---
+
+<MainGridLayout
+	title="学习日志"
+	description="记录每天学到的内容、图片与总结"
+>
+	<div class="flex w-full rounded-(--radius-large) overflow-clip relative min-h-32">
+		<div class="card-base z-10 px-4 py-6 md:px-9 relative w-full">
+			<div class="mb-6">
+				<PageTitle
+					title="学习日志"
+					eyebrow="Study"
+					description={import.meta.env.DEV
+						? "记录每天学到的内容、图片与总结"
+						: "查看已发布的学习记录、图片与总结"}
+				/>
+			</div>
+
+			{!import.meta.env.DEV && (
+				<section class="study-page study-public" aria-label="已发布学习日志">
+					<div class="study-toolbar">
+						<div class="study-toolbar__title">
+							<span class="study-toolbar__bar" aria-hidden="true"></span>
+							<h2 class="study-toolbar__heading">学习日志</h2>
+							<span class="study-toolbar__count">共 {publicLogs.length} 篇日志</span>
+						</div>
+					</div>
+
+					{publicLogs.length > 0 ? (
+						<div class="study-grid">
+							{publicLogs.map(({ entry, cover, href }) => (
+								<a class="study-card study-card--public" href={href}>
+									<div class:list={["study-card__cover", { "study-card__cover--empty": !cover }]}>
+										{cover ? <img src={cover} alt={entry.data.title} loading="lazy" /> : "学习日志"}
+									</div>
+									<div class="study-card__body">
+										<h3 class="study-card__title">{entry.data.title}</h3>
+										<div class="study-card__meta">
+											<span>{publicDateFormatter.format(entry.data.published)}</span>
+											<span>阅读全文 →</span>
+										</div>
+										<p class="study-card__summary">
+											{entry.data.description || "点击查看这篇学习记录。"}
+										</p>
+									</div>
+								</a>
+							))}
+						</div>
+					) : (
+						<p class="study-empty">还没有发布学习日志。</p>
+					)}
+					<p class="study-list-hint">公开页面仅供阅读，不提供新建、上传、编辑、导出或删除入口。</p>
+				</section>
+			)}
+
+			{import.meta.env.DEV && (
+			<div class="notes-page study-page" id="study-page">
+					<!-- 列表视图：与文章区一致的卡片网格 -->
+					<section class="study-list-view" id="study-list-view">
+						<div class="study-toolbar">
+							<div class="study-toolbar__title">
+								<span class="study-toolbar__bar" aria-hidden="true"></span>
+								<h2 class="study-toolbar__heading">学习日志</h2>
+								<span class="study-toolbar__count"
+									>共 <span id="study-count">0</span> 篇日志</span
+								>
+							</div>
+							<div class="study-toolbar__actions">
+								<label class="notes-search study-search">
+									<Icon name="material-symbols:search-rounded" is:inline />
+									<input
+										id="study-search"
+										type="search"
+										placeholder="搜索标题或内容…"
+										aria-label="搜索学习日志"
+									/>
+								</label>
+								<button type="button" class="notes-btn notes-btn--primary" id="study-new-btn">
+									<Icon name="material-symbols:add-rounded" is:inline />
+									<span>写日志</span>
+								</button>
+							</div>
+						</div>
+
+						<div class="study-grid" id="study-list"></div>
+
+						<p class="study-empty" id="study-side-empty">
+							还没有学习日志。点「写日志」开始记录。
+						</p>
+						<p class="study-list-hint">
+							内容和图片只存在这台设备的浏览器里，换设备不会同步。
+						</p>
+					</section>
+
+					<section class="notes-main study-main" id="study-main" hidden>
+
+					<!-- 编辑视图 -->
+					<div class="notes-editor" id="study-editor" hidden>
+						<div class="notes-editor__head">
+							<input
+								type="text"
+								id="study-editor-title"
+								class="notes-editor__title"
+								placeholder="今天学了什么？"
+								aria-label="日志标题"
+							/>
+							<div class="notes-editor__tools">
+								<button type="button" class="notes-btn notes-btn--primary" id="study-editor-save">
+									<Icon name="material-symbols:save-rounded" is:inline />
+									<span>保存</span>
+								</button>
+								<button type="button" class="notes-btn" id="study-editor-cancel">取消</button>
+							</div>
+						</div>
+
+						<label class="study-field">
+							<span class="study-field__label">学习内容</span>
+							<textarea
+								id="study-editor-content"
+								class="notes-editor__body study-editor__body"
+								placeholder="记录今天学到的知识点、代码片段或思路…"
+								spellcheck="false"
+							></textarea>
+						</label>
+
+						<div class="study-upload">
+							<div class="study-upload__head">
+								<span class="study-field__label">图片</span>
+								<button type="button" class="notes-btn" id="study-image-btn">
+									<Icon name="material-symbols:add-photo-alternate-rounded" is:inline />
+									<span>添加图片</span>
+								</button>
+								<input
+									id="study-image-input"
+									type="file"
+									accept="image/*"
+									multiple
+									hidden
+								/>
+							</div>
+							<div class="study-pending" id="study-pending" hidden></div>
+						</div>
+
+						<label class="study-field">
+							<span class="study-field__label">学习总结</span>
+							<textarea
+								id="study-editor-summary"
+								class="notes-editor__body study-editor__body study-editor__body--summary"
+								placeholder="用几句话总结今天的收获…"
+								spellcheck="false"
+							></textarea>
+						</label>
+
+						<p class="notes-editor__hint">
+							支持 Markdown（## 标题、``` 代码块、`行内代码`、列表等）；支持上传多张图片；保存后只存在这台设备的浏览器里。
+						</p>
+					</div>
+
+					<!-- 阅读视图 -->
+					<article class="notes-doc study-doc" id="study-doc" hidden>
+						<button type="button" class="study-back" id="study-back-btn">
+							<Icon name="material-symbols:arrow-back-rounded" is:inline />
+							<span>返回日志列表</span>
+						</button>
+
+						<div class="study-cover" id="study-cover" hidden>
+							<img id="study-cover-img" alt="" />
+						</div>
+
+						<header class="notes-doc__head">
+							<h2 class="notes-doc__title" id="study-doc-title"></h2>
+							<div class="notes-doc__meta">
+								<span id="study-doc-date"></span>
+							</div>
+						</header>
+
+						<section class="study-section" data-study-section="content">
+							<h3 class="study-section__title">学习内容</h3>
+							<div
+							class="study-text notes-content custom-md"
+							id="study-content"
+							data-pagefind-ignore></div>
+						</section>
+
+						<section class="study-section" id="study-images-section" hidden>
+							<h3 class="study-section__title">图片</h3>
+							<div class="study-images" id="study-images"></div>
+						</section>
+
+						<section class="study-section" data-study-section="summary">
+							<h3 class="study-section__title">学习总结</h3>
+							<div
+							class="study-text notes-content custom-md"
+							id="study-summary"
+							data-pagefind-ignore></div>
+						</section>
+
+						<footer class="study-doc__footer">
+							<button type="button" class="notes-btn" id="study-cover-btn">
+								<Icon name="material-symbols:add-photo-alternate-rounded" is:inline />
+								<span>换封面</span>
+							</button>
+							<button type="button" class="notes-btn" id="study-remove-cover" hidden>
+								移除封面
+							</button>
+							<input
+								id="study-cover-input"
+								type="file"
+								accept="image/*"
+								hidden
+							/>
+							<button type="button" class="notes-btn" id="study-export-btn">
+								<Icon name="material-symbols:download-rounded" is:inline />
+								<span>导出</span>
+							</button>
+							<button type="button" class="notes-btn" id="study-edit-btn">
+								<Icon name="material-symbols:edit-rounded" is:inline />
+								<span>编辑</span>
+							</button>
+							<button type="button" class="notes-btn notes-btn--danger" id="study-delete-btn">
+								<Icon name="material-symbols:delete-outline-rounded" is:inline />
+								<span>删除</span>
+							</button>
+						</footer>
+					</article>
+				</section>
+
+				<div class="notes-toast" id="study-toast" role="status" aria-live="polite"></div>
+			</div>
+			)}
+		</div>
+	</div>
+
+	<script>
+		import {
+			createRecordId,
+			deleteStudyLog,
+			listStudyImages,
+			listStudyLogs,
+			saveStudyImages,
+			saveStudyLog,
+		} from "@/utils/records-store";
+		import type { StudyImage, StudyLog } from "@/utils/records-store";
+		import {
+			buildFrontmatter,
+			downloadPublishBundle,
+			imageExtension,
+			sanitizeFileName,
+			toDateOnly,
+		} from "@/utils/publish-export";
+		import type { ExportImage } from "@/utils/publish-export";
+		import {
+			prepareMarkdown,
+			renderMarkdown,
+			stripMarkdownText,
+		} from "@/utils/local-markdown";
+
+		let dispose: (() => void) | null = null;
+		let initToken = 0;
+
+		function formatDate(ts: number): string {
+			return new Date(ts).toLocaleDateString("zh-CN", {
+				year: "numeric",
+				month: "2-digit",
+				day: "2-digit",
+			});
+		}
+
+		function initStudyPage() {
+			const page = document.getElementById("study-page");
+			if (!page) {
+				dispose?.();
+				dispose = null;
+				return;
+			}
+
+			dispose?.();
+			dispose = null;
+
+			const token = ++initToken;
+			const abort = new AbortController();
+			const { signal } = abort;
+
+			const listEl = document.getElementById("study-list");
+			const countEl = document.getElementById("study-count");
+			const sideEmpty = document.getElementById("study-side-empty");
+			const searchInput = document.getElementById(
+				"study-search",
+			) as HTMLInputElement | null;
+			const newBtn = document.getElementById("study-new-btn");
+			const listView = document.getElementById("study-list-view");
+			const studyMain = document.getElementById("study-main");
+			const backBtn = document.getElementById("study-back-btn");
+			const editorEl = document.getElementById("study-editor");
+			const titleInput = document.getElementById(
+				"study-editor-title",
+			) as HTMLInputElement | null;
+			const contentInput = document.getElementById(
+				"study-editor-content",
+			) as HTMLTextAreaElement | null;
+			const summaryInput = document.getElementById(
+				"study-editor-summary",
+			) as HTMLTextAreaElement | null;
+			const imageInput = document.getElementById(
+				"study-image-input",
+			) as HTMLInputElement | null;
+			const imageBtn = document.getElementById("study-image-btn");
+			const pendingEl = document.getElementById("study-pending");
+			const editorSave = document.getElementById("study-editor-save");
+			const editorCancel = document.getElementById("study-editor-cancel");
+			const docEl = document.getElementById("study-doc");
+			const docTitle = document.getElementById("study-doc-title");
+			const docDate = document.getElementById("study-doc-date");
+			const contentEl = document.getElementById("study-content");
+			const summaryEl = document.getElementById("study-summary");
+			const imagesSection = document.getElementById("study-images-section");
+			const imagesEl = document.getElementById("study-images");
+			const editBtn = document.getElementById("study-edit-btn");
+			const exportBtn = document.getElementById("study-export-btn");
+			const deleteBtn = document.getElementById("study-delete-btn");
+			const coverSection = document.getElementById("study-cover");
+			const coverImg = document.getElementById(
+				"study-cover-img",
+			) as HTMLImageElement | null;
+			const coverBtn = document.getElementById("study-cover-btn");
+			const coverInput = document.getElementById(
+				"study-cover-input",
+			) as HTMLInputElement | null;
+			const removeCoverBtn = document.getElementById("study-remove-cover");
+			const toastEl = document.getElementById("study-toast");
+
+			if (
+				!listEl ||
+				!editorEl ||
+				!docEl ||
+				!titleInput ||
+				!contentInput ||
+				!summaryInput ||
+				!contentEl ||
+				!summaryEl ||
+				!imagesEl
+			) {
+				dispose = () => abort.abort();
+				return;
+			}
+
+			let logs: StudyLog[] = [];
+			let currentId: string | null = null;
+			let keyword = "";
+			/** null 表示正在新建；有值表示正在编辑已有日志 */
+			let editingId: string | null = null;
+			let pendingFiles: File[] = [];
+			let existingImages: StudyImage[] = [];
+			let readUrls: string[] = [];
+			let editorUrls: string[] = [];
+			let cardUrls: string[] = [];
+			let coverUrl = "";
+			let coverTargetId: string | null = null;
+			let toastTimer = 0;
+
+			function releaseUrls(list: string[]) {
+				list.forEach((url) => URL.revokeObjectURL(url));
+				list.length = 0;
+			}
+
+			function releaseReadUrls() {
+				releaseUrls(readUrls);
+			}
+
+			function releaseEditorUrls() {
+				releaseUrls(editorUrls);
+			}
+
+			function releaseCardUrls() {
+				releaseUrls(cardUrls);
+			}
+
+			function releaseCoverUrl() {
+				if (coverUrl) {
+					URL.revokeObjectURL(coverUrl);
+					coverUrl = "";
+				}
+			}
+
+			dispose = () => {
+				abort.abort();
+				releaseReadUrls();
+				releaseEditorUrls();
+				releaseCardUrls();
+				releaseCoverUrl();
+				window.clearTimeout(toastTimer);
+			};
+
+			function toast(message: string) {
+				if (!toastEl) return;
+				toastEl.textContent = message;
+				toastEl.classList.add("is-visible");
+				window.clearTimeout(toastTimer);
+				toastTimer = window.setTimeout(
+					() => toastEl.classList.remove("is-visible"),
+					2200,
+				);
+			}
+
+			function filteredLogs(): StudyLog[] {
+				if (!keyword) return logs;
+				const kw = keyword.toLowerCase();
+				return logs.filter(
+					(log) =>
+						log.title.toLowerCase().includes(kw) ||
+						log.content.toLowerCase().includes(kw) ||
+						log.summary.toLowerCase().includes(kw),
+				);
+			}
+
+			function wordCount(log: StudyLog): number {
+				return (log.content + log.summary).replace(/\s/g, "").length;
+			}
+
+			function renderList() {
+				if (!listEl) return;
+				const visible = filteredLogs();
+				releaseCardUrls();
+				listEl.replaceChildren();
+				if (countEl) countEl.textContent = String(logs.length);
+
+				visible.forEach((log) => {
+					const card = document.createElement("article");
+					card.className = "study-card";
+					card.dataset.studyId = log.id;
+					card.tabIndex = 0;
+					if (log.id === currentId) card.classList.add("is-active");
+
+					const cover = document.createElement("div");
+					cover.className = "study-card__cover";
+					if (log.cover) {
+						const url = URL.createObjectURL(log.cover);
+						cardUrls.push(url);
+						const img = document.createElement("img");
+						img.src = url;
+						img.alt = log.title;
+						img.loading = "lazy";
+						img.decoding = "async";
+						cover.appendChild(img);
+					} else {
+						cover.classList.add("study-card__cover--empty");
+						cover.textContent = "无封面";
+					}
+
+					const actions = document.createElement("div");
+					actions.className = "study-card__actions";
+					const actionDefs = [
+						{ action: "cover", label: "换封面", danger: false },
+						{ action: "export", label: "导出", danger: false },
+						{ action: "edit", label: "编辑", danger: false },
+						{ action: "delete", label: "删除", danger: true },
+					];
+					for (const def of actionDefs) {
+						const btn = document.createElement("button");
+						btn.type = "button";
+						btn.className = "study-card__action";
+						if (def.danger) btn.classList.add("study-card__action--danger");
+						btn.dataset.studyAction = def.action;
+						btn.textContent = def.label;
+						actions.appendChild(btn);
+					}
+					cover.appendChild(actions);
+
+					const body = document.createElement("div");
+					body.className = "study-card__body";
+
+					const title = document.createElement("h3");
+					title.className = "study-card__title";
+					title.textContent = log.title;
+
+					const meta = document.createElement("div");
+					meta.className = "study-card__meta";
+					const date = document.createElement("span");
+					date.textContent = formatDate(log.updatedAt);
+					const words = document.createElement("span");
+					words.textContent = `${wordCount(log)} 字`;
+					meta.appendChild(date);
+					meta.appendChild(words);
+
+					const summary = document.createElement("p");
+					summary.className = "study-card__summary";
+					summary.textContent =
+						stripMarkdownText(log.summary || log.content) || "还没有写内容";
+
+					body.appendChild(title);
+					body.appendChild(meta);
+					body.appendChild(summary);
+
+					card.appendChild(cover);
+					card.appendChild(body);
+					listEl.appendChild(card);
+				});
+
+				const isEmpty = visible.length === 0;
+				listEl.hidden = isEmpty;
+				if (sideEmpty) {
+					sideEmpty.hidden = !isEmpty;
+					sideEmpty.textContent =
+						logs.length === 0
+							? "还没有学习日志。点「写日志」开始记录。"
+							: "没有匹配的学习日志";
+				}
+			}
+
+			function hasEditorContent(): boolean {
+				return Boolean(
+					titleInput?.value.trim() ||
+						contentInput?.value.trim() ||
+						summaryInput?.value.trim() ||
+						pendingFiles.length > 0,
+				);
+			}
+
+			function renderPending() {
+				if (!pendingEl) return;
+				releaseEditorUrls();
+				pendingEl.replaceChildren();
+
+				let count = 0;
+
+				for (const image of existingImages) {
+					const item = document.createElement("div");
+					item.className = "study-pending__item";
+
+					const url = URL.createObjectURL(image.blob);
+					editorUrls.push(url);
+
+					const img = document.createElement("img");
+					img.src = url;
+					img.alt = image.name;
+					img.loading = "lazy";
+
+					const tag = document.createElement("span");
+					tag.className = "study-pending__tag";
+					tag.textContent = "已保存";
+
+					item.appendChild(img);
+					item.appendChild(tag);
+					pendingEl.appendChild(item);
+					count += 1;
+				}
+
+				pendingFiles.forEach((file, index) => {
+					const item = document.createElement("div");
+					item.className = "study-pending__item";
+
+					const url = URL.createObjectURL(file);
+					editorUrls.push(url);
+
+					const img = document.createElement("img");
+					img.src = url;
+					img.alt = file.name;
+					img.loading = "lazy";
+
+					const tag = document.createElement("span");
+					tag.className = "study-pending__tag";
+					tag.textContent = "待上传";
+
+					const remove = document.createElement("button");
+					remove.type = "button";
+					remove.className = "study-pending__remove";
+					remove.dataset.studyPendingRemove = String(index);
+					remove.setAttribute("aria-label", "移除这张待上传图片");
+					remove.textContent = "×";
+
+					item.appendChild(img);
+					item.appendChild(tag);
+					item.appendChild(remove);
+					pendingEl.appendChild(item);
+					count += 1;
+				});
+
+				pendingEl.hidden = count === 0;
+			}
+
+			async function openEditor(log?: StudyLog) {
+				editingId = log?.id ?? null;
+				pendingFiles = [];
+				existingImages = [];
+				titleInput.value = log?.title ?? "";
+				contentInput.value = log?.content ?? "";
+				summaryInput.value = log?.summary ?? "";
+				if (imageInput) imageInput.value = "";
+				releaseEditorUrls();
+				renderPending();
+
+				if (listView) listView.hidden = true;
+				if (studyMain) studyMain.hidden = false;
+				editorEl.hidden = false;
+				docEl.hidden = true;
+				titleInput.focus();
+
+				if (window.matchMedia("(max-width: 768px)").matches) {
+					document
+						.getElementById("study-main")
+						?.scrollIntoView({ behavior: "smooth", block: "start" });
+				}
+
+				if (!log) return;
+
+				try {
+					const images = await listStudyImages(log.id);
+					if (token !== initToken || editingId !== log.id) return;
+					existingImages = images;
+					renderPending();
+				} catch {
+					// 图片读取失败时仍可编辑文字
+				}
+			}
+
+			function closeEditor() {
+				editorEl.hidden = true;
+				editingId = null;
+				pendingFiles = [];
+				existingImages = [];
+				releaseEditorUrls();
+				if (pendingEl) {
+					pendingEl.replaceChildren();
+					pendingEl.hidden = true;
+				}
+
+				if (!currentId) {
+					docEl.hidden = true;
+					if (studyMain) studyMain.hidden = true;
+					if (listView) listView.hidden = false;
+					return;
+				}
+				if (listView) listView.hidden = true;
+				if (studyMain) studyMain.hidden = false;
+				docEl.hidden = false;
+			}
+
+			async function loadReadImages(logId: string) {
+				releaseReadUrls();
+				imagesEl.replaceChildren();
+				if (imagesSection) imagesSection.hidden = true;
+
+				let images: StudyImage[] = [];
+				try {
+					images = await listStudyImages(logId);
+				} catch {
+					images = [];
+				}
+				if (token !== initToken || currentId !== logId) return;
+
+				for (const image of images) {
+					const url = URL.createObjectURL(image.blob);
+					readUrls.push(url);
+
+					const figure = document.createElement("figure");
+					figure.className = "study-image";
+
+					const img = document.createElement("img");
+					img.src = url;
+					img.alt = image.name;
+					img.loading = "lazy";
+					img.decoding = "async";
+
+					const caption = document.createElement("figcaption");
+					caption.textContent = image.name;
+
+					figure.appendChild(img);
+					figure.appendChild(caption);
+					imagesEl.appendChild(figure);
+				}
+
+				if (imagesSection) imagesSection.hidden = images.length === 0;
+				if (images.length === 0) releaseReadUrls();
+			}
+
+			async function openLog(id: string) {
+				const log = logs.find((entry) => entry.id === id);
+				if (!log) return;
+
+				if (!editorEl.hidden) {
+					if (hasEditorContent() && !window.confirm("放弃当前未保存的内容？")) {
+						return;
+					}
+					closeEditor();
+				}
+
+				currentId = id;
+				renderList();
+
+				if (listView) listView.hidden = true;
+				if (studyMain) studyMain.hidden = false;
+				docEl.hidden = false;
+				if (docTitle) docTitle.textContent = log.title;
+				if (docDate) docDate.textContent = formatDate(log.updatedAt);
+				// 学习内容与总结按 Markdown 渲染，风格与笔记页一致（标题 / 代码块 / 行内代码等）
+				await prepareMarkdown();
+				renderMarkdown(log.content.trim() || "还没有写内容", contentEl);
+				renderMarkdown(log.summary.trim() || "还没有写总结", summaryEl);
+
+				releaseCoverUrl();
+				if (coverSection && coverImg) {
+					if (log.cover) {
+						coverUrl = URL.createObjectURL(log.cover);
+						coverImg.src = coverUrl;
+						coverImg.alt = log.title;
+						coverSection.hidden = false;
+					} else {
+						coverImg.removeAttribute("src");
+						coverSection.hidden = true;
+					}
+				}
+				if (removeCoverBtn) removeCoverBtn.hidden = !log.cover;
+
+				await loadReadImages(id);
+
+				if (window.matchMedia("(max-width: 768px)").matches) {
+					document
+						.getElementById("study-main")
+						?.scrollIntoView({ behavior: "smooth", block: "start" });
+				}
+			}
+
+			async function reload(selectId?: string) {
+				let next: StudyLog[] = [];
+				try {
+					next = await listStudyLogs();
+				} catch {
+					toast("浏览器不支持本地存储（IndexedDB 被禁用？）");
+					return;
+				}
+				if (token !== initToken) return;
+
+				logs = next;
+
+				if (selectId && logs.some((log) => log.id === selectId)) {
+					currentId = selectId;
+				}
+				if (currentId && !logs.some((log) => log.id === currentId)) {
+					currentId = null;
+				}
+
+				renderList();
+
+				if (currentId) {
+					await openLog(currentId);
+					return;
+				}
+
+				docEl.hidden = true;
+				if (studyMain) studyMain.hidden = true;
+				if (listView) listView.hidden = false;
+				contentEl.textContent = "";
+				summaryEl.textContent = "";
+				imagesEl.replaceChildren();
+				if (imagesSection) imagesSection.hidden = true;
+				if (coverSection) coverSection.hidden = true;
+				if (removeCoverBtn) removeCoverBtn.hidden = true;
+				releaseReadUrls();
+				releaseCoverUrl();
+			}
+
+			async function saveEditor() {
+				const title = titleInput.value.trim();
+				if (!title) {
+					toast("先给这篇日志起个标题");
+					titleInput.focus();
+					return;
+				}
+
+				const existing = editingId
+					? logs.find((log) => log.id === editingId)
+					: undefined;
+				const id = existing?.id ?? createRecordId();
+				const now = Date.now();
+				const record: StudyLog = {
+					id,
+					title,
+					content: contentInput.value,
+					summary: summaryInput.value,
+					cover: existing?.cover ?? null,
+					createdAt: existing?.createdAt ?? now,
+					updatedAt: now,
+				};
+
+				try {
+					await saveStudyLog(record);
+				} catch {
+					toast("保存失败，可能是浏览器存储空间不足");
+					return;
+				}
+
+				if (pendingFiles.length > 0) {
+					try {
+						await saveStudyImages(id, pendingFiles);
+					} catch {
+						toast("日志已保存，但图片保存失败");
+					}
+				}
+				if (token !== initToken) return;
+
+				currentId = id;
+				closeEditor();
+				await reload(id);
+				toast(existing ? "已保存" : "已新建日志");
+			}
+
+			async function updateCover(
+				file: File | null,
+				targetId?: string | null,
+			) {
+				const id = targetId ?? currentId;
+				const log = logs.find((entry) => entry.id === id);
+				if (!log) return;
+
+				try {
+					await saveStudyLog({ ...log, cover: file });
+				} catch {
+					toast("封面保存失败，可能是浏览器存储空间不足");
+					return;
+				}
+				if (token !== initToken) return;
+
+				logs = logs.map((entry) =>
+					entry.id === id ? { ...entry, cover: file } : entry,
+				);
+				renderList();
+				if (!docEl.hidden && currentId === id) {
+					await openLog(id);
+				}
+				toast(file ? "封面已更新" : "封面已移除");
+			}
+
+			async function removeCurrentLog(targetId: string | null = currentId) {
+				const log = logs.find((entry) => entry.id === targetId);
+				if (!log) return;
+				if (
+					!window.confirm(`删除「${log.title}」？该操作不可恢复，关联图片也会一起删除。`)
+				) {
+					return;
+				}
+
+				try {
+					await deleteStudyLog(log.id);
+				} catch {
+					toast("删除失败，可能是浏览器存储不可用");
+					return;
+				}
+				if (token !== initToken) return;
+
+				currentId = null;
+				await reload();
+				toast("已删除");
+			}
+
+			/** 取学习内容第一行，去掉常见 Markdown 标记后截断 100 字，作为 frontmatter 描述 */
+			function describeContent(content: string): string {
+				const firstLine =
+					content
+						.split(/\r?\n/)
+						.map((line) => line.trim())
+						.find((line) => line.length > 0) ?? "";
+				return firstLine
+					.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+					.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+					.replace(/^\s*(?:[-+*>]|\d+\.)\s+/, "")
+					.replace(/[`*_~#]/g, "")
+					.replace(/\s+/g, " ")
+					.trim()
+					.slice(0, 100);
+			}
+
+			/** 把日志和图片导出成可直接放进 src/content 的 Markdown */
+			async function exportLog(id: string) {
+				const log = logs.find((entry) => entry.id === id);
+				if (!log) return;
+
+				let images: StudyImage[] = [];
+				try {
+					images = await listStudyImages(id);
+				} catch {
+					// 图片读不到时仍然导出文字
+				}
+				if (token !== initToken) return;
+
+				const base = sanitizeFileName(log.title);
+				const exportImages: ExportImage[] = [];
+				const imageLines: string[] = [];
+
+				images.forEach((image, index) => {
+					const name = `${base}-${index + 1}.${imageExtension(image.blob, image.name)}`;
+					exportImages.push({ name, blob: image.blob });
+					imageLines.push(`![学习图片](./${name})`);
+				});
+
+				let coverName = "";
+				if (log.cover) {
+					coverName = `${base}-cover.${imageExtension(log.cover)}`;
+					exportImages.unshift({ name: coverName, blob: log.cover });
+				}
+
+				const frontmatter = buildFrontmatter({
+					title: log.title,
+					published: { raw: toDateOnly(log.createdAt) },
+					updated: { raw: toDateOnly(log.updatedAt) },
+					tags: ["学习日志"],
+					description: describeContent(log.content),
+					image: coverName ? `./${coverName}` : undefined,
+				});
+
+				const blocks: string[] = [];
+				if (log.content.trim()) blocks.push(log.content.trim());
+				if (log.summary.trim()) blocks.push(`## 学习总结\n\n${log.summary.trim()}`);
+				if (imageLines.length > 0) {
+					blocks.push(`## 学习图片\n\n${imageLines.join("\n")}`);
+				}
+				const markdown = `${frontmatter}${blocks.join("\n\n")}\n`;
+
+				try {
+					const { markdownName, imageCount } = downloadPublishBundle(
+						markdown,
+						base,
+						exportImages,
+					);
+					toast(
+						`已导出 ${markdownName}${imageCount ? ` + ${imageCount} 张图片` : ""}，放进 src/content/文章/学习日志/ 后重新构建即可公开`,
+					);
+				} catch {
+					toast("导出失败，请稍后重试");
+				}
+			}
+
+			// ── 事件绑定 ──
+			newBtn?.addEventListener(
+				"click",
+				() => {
+					if (
+						!editorEl.hidden &&
+						hasEditorContent() &&
+						!window.confirm("放弃当前未保存的内容？")
+					) {
+						return;
+					}
+					void openEditor();
+				},
+				{ signal },
+			);
+
+			editorSave?.addEventListener("click", () => void saveEditor(), {
+				signal,
+			});
+
+			editorCancel?.addEventListener("click", closeEditor, { signal });
+
+			editBtn?.addEventListener(
+				"click",
+				() => {
+					const log = logs.find((entry) => entry.id === currentId);
+					if (log) void openEditor(log);
+				},
+				{ signal },
+			);
+
+			deleteBtn?.addEventListener("click", () => void removeCurrentLog(), {
+				signal,
+			});
+
+			exportBtn?.addEventListener(
+				"click",
+				() => {
+					if (currentId) void exportLog(currentId);
+				},
+				{ signal },
+			);
+
+			backBtn?.addEventListener(
+				"click",
+				() => {
+					currentId = null;
+					docEl.hidden = true;
+					if (studyMain) studyMain.hidden = true;
+					if (listView) listView.hidden = false;
+					renderList();
+				},
+				{ signal },
+			);
+
+			// 卡片：点击进入阅读；卡片上的换封面 / 编辑 / 删除按钮各自处理
+			listEl?.addEventListener(
+				"click",
+				(event) => {
+					const target = event.target as HTMLElement | null;
+					const card = target?.closest<HTMLElement>("[data-study-id]");
+					const id = card?.dataset.studyId;
+					if (!card || !id) return;
+
+					const actionBtn = target?.closest<HTMLElement>("[data-study-action]");
+					if (actionBtn) {
+						event.stopPropagation();
+						const action = actionBtn.dataset.studyAction;
+						if (action === "cover") {
+							coverTargetId = id;
+							coverInput?.click();
+						} else if (action === "edit") {
+							const log = logs.find((entry) => entry.id === id);
+							if (log) void openEditor(log);
+						} else if (action === "export") {
+							void exportLog(id);
+						} else if (action === "delete") {
+							void removeCurrentLog(id);
+						}
+						return;
+					}
+
+					void openLog(id);
+				},
+				{ signal },
+			);
+
+			listEl?.addEventListener(
+				"keydown",
+				(event) => {
+					if (event.key !== "Enter" && event.key !== " ") return;
+					const target = event.target as HTMLElement | null;
+					if (target?.closest("[data-study-action]")) return;
+					const id = target?.closest<HTMLElement>("[data-study-id]")?.dataset
+						.studyId;
+					if (!id) return;
+					event.preventDefault();
+					void openLog(id);
+				},
+				{ signal },
+			);
+
+			coverBtn?.addEventListener(
+				"click",
+				() => {
+					coverTargetId = currentId;
+					coverInput?.click();
+				},
+				{ signal },
+			);
+
+			coverInput?.addEventListener(
+				"change",
+				() => {
+					const target = coverTargetId;
+					coverTargetId = null;
+					const file = coverInput.files?.[0];
+					coverInput.value = "";
+					if (!file) return;
+					if (!file.type.startsWith("image/")) {
+						toast("请选择图片文件");
+						return;
+					}
+					void updateCover(file, target);
+				},
+				{ signal },
+			);
+
+			removeCoverBtn?.addEventListener(
+				"click",
+				() => void updateCover(null),
+				{ signal },
+			);
+
+			searchInput?.addEventListener(
+				"input",
+				() => {
+					keyword = searchInput.value.trim();
+					renderList();
+				},
+				{ signal },
+			);
+
+			imageBtn?.addEventListener(
+				"click",
+				() => imageInput?.click(),
+				{ signal },
+			);
+
+			imageInput?.addEventListener(
+				"change",
+				() => {
+					const files = Array.from(imageInput.files ?? []).filter(
+						(file) => file.type.startsWith("image/"),
+					);
+					imageInput.value = "";
+					if (files.length === 0) {
+						toast("请选择图片文件");
+						return;
+					}
+					pendingFiles = [...pendingFiles, ...files];
+					renderPending();
+				},
+				{ signal },
+			);
+
+			pendingEl?.addEventListener(
+				"click",
+				(event) => {
+					const target = event.target as HTMLElement | null;
+					const button = target?.closest<HTMLElement>(
+						"[data-study-pending-remove]",
+					);
+					if (!button) return;
+					const index = Number(button.dataset.studyPendingRemove);
+					if (!Number.isInteger(index)) return;
+					pendingFiles.splice(index, 1);
+					renderPending();
+				},
+				{ signal },
+			);
+
+			for (const field of [contentInput, summaryInput]) {
+				field.addEventListener(
+					"keydown",
+					(event) => {
+						if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+							event.preventDefault();
+							void saveEditor();
+						}
+					},
+					{ signal },
+				);
+			}
+
+			titleInput.addEventListener(
+				"keydown",
+				(event) => {
+					if (event.key === "Enter") {
+						event.preventDefault();
+						contentInput.focus();
+					}
+				},
+				{ signal },
+			);
+
+			window.addEventListener("pagehide", releaseReadUrls, { signal });
+			window.addEventListener("pagehide", releaseEditorUrls, { signal });
+			window.addEventListener("pagehide", releaseCoverUrl, { signal });
+
+			void reload();
+		}
+
+		initStudyPage();
+		document.addEventListener("astro:page-load", initStudyPage);
+		document.addEventListener("swup:content:replaced", initStudyPage);
+	</script>
+
+	<style is:global>
+		/* 学习日志专属样式：动态创建的图片预览/阅读图片也需要生效，所以写成全局，
+		   统一收敛在 .study-page 下，避免影响笔记页等其它页面。 */
+
+		/* 列表视图改为文章区同款卡片网格，不再沿用笔记页两栏布局 */
+		.study-page {
+			display: block;
+		}
+
+		.study-page [hidden] {
+			display: none !important;
+		}
+
+		.study-toolbar {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			flex-wrap: wrap;
+			gap: 0.75rem;
+			margin-bottom: 1.1rem;
+		}
+
+		.study-toolbar__title {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.study-toolbar__bar {
+			width: 0.22rem;
+			height: 1.05rem;
+			border-radius: 999px;
+			background: var(--primary);
+		}
+
+		.study-toolbar__heading {
+			margin: 0;
+			font-size: 1.02rem;
+			font-weight: 800;
+			letter-spacing: 0.02em;
+			color: var(--deep-text);
+		}
+
+		.study-toolbar__count {
+			font-size: 0.72rem;
+			color: var(--content-meta);
+		}
+
+		.study-toolbar__actions {
+			display: flex;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 0.6rem;
+		}
+
+		.study-toolbar__actions .study-search {
+			margin: 0;
+			width: 13rem;
+			max-width: 100%;
+		}
+
+		.study-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+			gap: 1.1rem;
+		}
+
+		.study-card {
+			position: relative;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			border: 1.5px solid var(--line-divider);
+			border-radius: 0.75rem;
+			background: color-mix(in oklch, var(--deep-text) 3%, transparent);
+			cursor: pointer;
+			transition: transform 0.18s ease, border-color 0.18s ease;
+		}
+
+		.study-card--public {
+			text-decoration: none;
+		}
+
+		.study-card:hover,
+		.study-card:focus-visible {
+			border-color: var(--primary);
+			transform: translateY(-2px);
+		}
+
+		.study-card.is-active {
+			border-color: var(--primary);
+		}
+
+		.study-card__cover {
+			position: relative;
+			aspect-ratio: 16 / 9;
+			overflow: hidden;
+			background: color-mix(in oklch, var(--deep-text) 6%, transparent);
+		}
+
+		.study-card__cover img {
+			display: block;
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+
+		.study-card__cover--empty {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--content-meta);
+			font-size: 0.75rem;
+			letter-spacing: 0.12em;
+		}
+
+		.study-card__actions {
+			position: absolute;
+			top: 0.5rem;
+			right: 0.5rem;
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: flex-end;
+			gap: 0.3rem;
+			max-width: calc(100% - 1rem);
+			opacity: 0;
+			transition: opacity 0.18s ease;
+		}
+
+		.study-card:hover .study-card__actions,
+		.study-card:focus-within .study-card__actions {
+			opacity: 1;
+		}
+
+		.study-card__action {
+			padding: 0.22rem 0.55rem;
+			border: none;
+			border-radius: 0.45rem;
+			background: rgba(0, 0, 0, 0.55);
+			color: #fff;
+			font-size: 0.68rem;
+			font-weight: 700;
+			cursor: pointer;
+			backdrop-filter: blur(4px);
+			transition: background-color 0.15s ease;
+		}
+
+		.study-card__action:hover {
+			background: var(--primary);
+		}
+
+		.study-card__action--danger {
+			color: #ff9b9b;
+		}
+
+		.study-card__action--danger:hover {
+			background: #d94848;
+			color: #fff;
+		}
+
+		.study-card__body {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			padding: 0.7rem 0.8rem 0.85rem;
+		}
+
+		.study-card__title {
+			margin: 0;
+			overflow: hidden;
+			color: var(--deep-text);
+			font-size: 0.92rem;
+			font-weight: 800;
+			line-height: 1.35;
+			display: -webkit-box;
+			-webkit-line-clamp: 1;
+			-webkit-box-orient: vertical;
+		}
+
+		.study-card__meta {
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+			color: var(--content-meta);
+			font-size: 0.68rem;
+		}
+
+		.study-card__summary {
+			margin: 0;
+			overflow: hidden;
+			color: var(--content-meta);
+			font-size: 0.76rem;
+			line-height: 1.6;
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+		}
+
+		.study-empty {
+			margin: 1.6rem 0;
+			color: var(--content-meta);
+			font-size: 0.82rem;
+			text-align: center;
+		}
+
+		.study-list-hint {
+			margin: 1rem 0 0;
+			color: var(--content-meta);
+			font-size: 0.7rem;
+		}
+
+		.study-main {
+			display: block;
+		}
+
+		.study-back {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+			margin-bottom: 0.9rem;
+			padding: 0.3rem 0.7rem;
+			border: 1.5px solid var(--line-divider);
+			border-radius: 999px;
+			background: transparent;
+			color: var(--content-meta);
+			font-size: 0.74rem;
+			cursor: pointer;
+			transition: color 0.15s ease, border-color 0.15s ease;
+		}
+
+		.study-back:hover {
+			border-color: var(--primary);
+			color: var(--primary);
+		}
+
+		@media (max-width: 768px) {
+			.study-toolbar__actions {
+				width: 100%;
+			}
+
+			.study-toolbar__actions .study-search {
+				flex: 1 1 10rem;
+				width: auto;
+			}
+		}
+
+		.study-page .study-doc__title {
+			color: var(--deep-text);
+		}
+
+		/* 日志封面：未设置时整块隐藏 */
+		.study-page .study-cover {
+			overflow: hidden;
+			margin-bottom: 1rem;
+			border: 1.5px solid var(--line-divider);
+			border-radius: 0.75rem;
+			background: color-mix(in oklch, var(--deep-text) 5%, transparent);
+		}
+
+		.study-page .study-cover[hidden] {
+			display: none;
+		}
+
+		.study-page .study-cover img {
+			display: block;
+			width: 100%;
+			aspect-ratio: 16 / 7;
+			object-fit: cover;
+		}
+
+		/* notes-btn 自带 display，需显式处理 hidden，否则「移除封面」会一直显示 */
+		.study-page .study-doc__footer .notes-btn[hidden] {
+			display: none;
+		}
+
+		.study-page .study-section[hidden] {
+			display: none;
+		}
+
+		.study-page .study-section {
+			margin-top: 1.35rem;
+		}
+
+		.study-page .study-section__title {
+			margin: 0 0 0.5rem;
+			font-size: 0.75rem;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			color: var(--content-meta);
+		}
+
+		.study-page .study-text {
+			color: var(--deep-text);
+			font-size: 0.9rem;
+			line-height: 1.85;
+			white-space: normal;
+			overflow-wrap: anywhere;
+		}
+
+		/* Markdown 渲染后的排版：标题 / 列表 / 引用 / 图片，其余（代码块等）复用 notes.css */
+		.study-page .study-text > :first-child {
+			margin-top: 0;
+		}
+
+		.study-page .study-text > :last-child {
+			margin-bottom: 0;
+		}
+
+		.study-page .study-text h1,
+		.study-page .study-text h2,
+		.study-page .study-text h3,
+		.study-page .study-text h4 {
+			margin: 1.4em 0 0.55em;
+			font-weight: 700;
+			line-height: 1.35;
+		}
+
+		.study-page .study-text h1 {
+			font-size: 1.65em;
+		}
+
+		.study-page .study-text h2 {
+			font-size: 1.4em;
+		}
+
+		.study-page .study-text h3 {
+			font-size: 1.18em;
+		}
+
+		.study-page .study-text h4 {
+			font-size: 1.02em;
+		}
+
+		.study-page .study-text ul,
+		.study-page .study-text ol {
+			margin: 0.7em 0;
+			padding-left: 1.4em;
+		}
+
+		.study-page .study-text ul {
+			list-style: disc;
+		}
+
+		.study-page .study-text ol {
+			list-style: decimal;
+		}
+
+		.study-page .study-text li {
+			margin: 0.22em 0;
+		}
+
+		.study-page .study-text li > p {
+			margin: 0.2em 0;
+		}
+
+		.study-page .study-text blockquote {
+			margin: 1em 0;
+			padding-left: 0.9em;
+			border-left: 3px solid var(--line-divider);
+			color: var(--content-meta);
+		}
+
+		.study-page .study-text hr {
+			margin: 1.5em 0;
+			border: 0;
+			border-top: 1px dashed var(--line-divider);
+		}
+
+		.study-page .study-text img {
+			max-width: 100%;
+			border-radius: 0.6rem;
+		}
+
+		.study-page .study-text table {
+			width: 100%;
+		}
+
+		.study-page .study-text input[type="checkbox"] {
+			margin-right: 0.35em;
+		}
+
+		.study-page .study-doc__footer {
+			display: flex;
+			justify-content: flex-end;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+			margin-top: 1.6rem;
+			padding-top: 1rem;
+			border-top: 1px dashed var(--line-divider);
+		}
+
+		/* 阅读视图图片网格 */
+		.study-page .study-images {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+			gap: 0.65rem;
+		}
+
+		.study-page .study-image {
+			margin: 0;
+			overflow: hidden;
+			border: 1px solid var(--line-divider);
+			border-radius: 0.6rem;
+			background: color-mix(in oklch, var(--deep-text) 4%, transparent);
+		}
+
+		.study-page .study-image img {
+			display: block;
+			width: 100%;
+			aspect-ratio: 4 / 3;
+			object-fit: cover;
+		}
+
+		.study-page .study-image figcaption {
+			padding: 0.25rem 0.45rem;
+			overflow: hidden;
+			color: var(--content-meta);
+			font-size: 0.65rem;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		/* 编辑器 */
+		.study-page .study-field {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			margin-bottom: 1rem;
+		}
+
+		.study-page .study-field__label {
+			color: var(--content-meta);
+			font-size: 0.75rem;
+			font-weight: 600;
+		}
+
+		.study-page .study-editor__body {
+			min-height: 14rem;
+			font-family: inherit;
+			font-size: 0.9rem;
+			line-height: 1.85;
+			color: var(--deep-text);
+		}
+
+		.study-page .study-editor__body--summary {
+			min-height: 8rem;
+		}
+
+		.study-page .study-upload {
+			margin-bottom: 1rem;
+		}
+
+		.study-page .study-upload__head {
+			display: flex;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 0.65rem;
+			margin-bottom: 0.5rem;
+		}
+
+		.study-page .study-pending {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.55rem;
+		}
+
+		.study-page .study-pending[hidden] {
+			display: none;
+		}
+
+		.study-page .study-pending__item {
+			position: relative;
+			width: 6.5rem;
+		}
+
+		.study-page .study-pending__item img {
+			display: block;
+			width: 100%;
+			aspect-ratio: 4 / 3;
+			object-fit: cover;
+			border: 1px solid var(--line-divider);
+			border-radius: 0.5rem;
+		}
+
+		.study-page .study-pending__tag {
+			display: block;
+			margin-top: 0.2rem;
+			color: var(--content-meta);
+			font-size: 0.65rem;
+			text-align: center;
+		}
+
+		.study-page .study-pending__remove {
+			position: absolute;
+			top: -0.35rem;
+			right: -0.35rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 1.25rem;
+			height: 1.25rem;
+			padding: 0;
+			border: 1.5px solid #d1495b;
+			border-radius: 9999px;
+			background: var(--page-bg);
+			color: #d1495b;
+			font-size: 0.9rem;
+			line-height: 1;
+			cursor: pointer;
+			transition:
+				background-color 0.2s ease,
+				color 0.2s ease;
+		}
+
+		.study-page .study-pending__remove:hover {
+			background: #d1495b;
+			color: #fff;
+		}
+
+		@media (max-width: 768px) {
+			.study-page .study-images {
+				grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+			}
+		}
+	</style>
+</MainGridLayout>

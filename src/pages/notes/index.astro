@@ -1,0 +1,1315 @@
+---
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import PageTitle from "@/components/common/PageTitle.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import { isPublicPost } from "@/utils/content-utils";
+import { getPostUrlBySlug } from "@/utils/url-utils";
+
+// 本地笔记：md 存在浏览器 IndexedDB 里，静态站点不需要后端。
+// 需要沉淀成正式文章时点「导出 md」，把文件放进 src/content/文章/ 再构建。
+
+// 标签候选：文章的分类文件夹（生活随笔、技术分享…）+ 文章 frontmatter 里的 tags
+const articleModules = import.meta.glob("/src/content/文章/**/*.{md,mdx}", {
+	eager: true,
+}) as Record<string, { frontmatter?: { tags?: string[] } }>;
+const noteTagOptions = (() => {
+	const set = new Set<string>();
+	for (const [filePath, mod] of Object.entries(articleModules)) {
+		const dir = filePath.split("/")[4];
+		if (dir && !dir.includes(".")) set.add(dir);
+		for (const tag of mod.frontmatter?.tags ?? []) set.add(tag);
+	}
+	return [...set].sort((a, b) => a.localeCompare(b, "zh"));
+})();
+
+const publicNotes = import.meta.env.DEV
+	? []
+	: (
+			await getCollection(
+				"posts",
+				({ data }) => data.downloadable && isPublicPost(data),
+			)
+		).sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
+const publicDateFormatter = new Intl.DateTimeFormat("zh-CN", {
+	year: "numeric",
+	month: "2-digit",
+	day: "2-digit",
+});
+---
+
+<MainGridLayout title="笔记" description="把 Typora 里的 md 拖进来，直接在浏览器里读">
+	<div class="flex w-full rounded-(--radius-large) overflow-clip relative min-h-32">
+		<div class="card-base z-10 px-4 py-6 md:px-6 relative w-full">
+			<div class="mb-6">
+				<PageTitle
+					title="笔记"
+					eyebrow="Notes"
+					description={import.meta.env.DEV
+						? "把 Typora 导出的 md 拖进来即可阅读；数据只存在这台设备的浏览器里"
+						: "这里展示已发布的笔记，正文与目录在阅读页中查看"}
+				/>
+			</div>
+
+			{!import.meta.env.DEV && (
+				<section class="notes-public" aria-label="已发布笔记">
+					<div class="notes-public__head">
+						<span class="notes-side__label">[ 已发布笔记 ]</span>
+						<span class="notes-count">{publicNotes.length}</span>
+					</div>
+					{publicNotes.length > 0 ? (
+						<ul class="notes-public__list">
+							{publicNotes.map((note) => (
+								<li>
+									<a class="notes-public__item" href={getPostUrlBySlug(note.id)}>
+										<span class="notes-public__title">{note.data.title}</span>
+										<span class="notes-public__meta">
+											{publicDateFormatter.format(note.data.published)}
+										</span>
+										{note.data.description && (
+											<span class="notes-public__description">{note.data.description}</span>
+										)}
+										<span class="notes-public__open">阅读全文与目录 →</span>
+									</a>
+								</li>
+							))}
+						</ul>
+					) : (
+						<p class="notes-public__empty">还没有发布笔记。</p>
+					)}
+					<p class="notes-side__hint">公开页面仅用于阅读，不提供编辑、上传或删除入口。</p>
+				</section>
+			)}
+
+			{import.meta.env.DEV && (
+			<div class="notes-page" id="notes-page">
+				<aside class="notes-side">
+					<div class="notes-library" id="notes-library">
+					<div class="notes-side__head">
+						<span class="notes-side__label">[ 本地笔记 ]</span>
+						<span class="notes-count" id="notes-count">0</span>
+					</div>
+
+					<div class="notes-actions">
+						<button type="button" class="notes-btn" id="notes-new-btn">
+							<Icon name="material-symbols:add-rounded" is:inline />
+							<span>写文章</span>
+						</button>
+						<button type="button" class="notes-btn notes-btn--primary" id="notes-upload-btn">
+							<Icon name="material-symbols:upload-rounded" is:inline />
+							<span>上传文件</span>
+						</button>
+						<input
+							id="notes-file-input"
+							type="file"
+							accept=".md,.markdown,text/markdown,image/*"
+							multiple
+							hidden
+						/>
+					</div>
+
+					<label class="notes-upload-tag">
+						<span>导入标签</span>
+						<select id="notes-upload-tag" aria-label="上传文件时使用的标签">
+							<option value="">沿用文件标签</option>
+							{noteTagOptions.map((tag) => <option value={tag}>{tag}</option>)}
+						</select>
+					</label>
+
+					<label class="notes-search">
+						<Icon name="material-symbols:search-rounded" is:inline />
+						<input id="notes-search" type="search" placeholder="搜索标题或正文…" aria-label="搜索笔记" />
+					</label>
+
+					<ul class="notes-list" id="notes-list"></ul>
+
+					<p class="notes-side__empty" id="notes-side-empty">
+						还没有笔记。点「写文章」开始，或上传 md。
+					</p>
+					<p class="notes-side__hint">
+						md 和图片可以一起拖进来；图片按文件名匹配笔记里的相对路径。
+					</p>
+					</div>
+
+					<div class="notes-reader-side" id="notes-reader-side" hidden>
+						<button type="button" class="notes-back" id="notes-back-btn">
+							<Icon name="material-symbols:arrow-back-rounded" is:inline />
+							<span>返回笔记列表</span>
+						</button>
+						<div class="notes-side__head">
+							<span class="notes-side__label">[ 本文目录 ]</span>
+						</div>
+						<nav class="notes-toc" id="notes-toc" aria-label="本文目录"></nav>
+					</div>
+				</aside>
+
+				<section class="notes-main" id="notes-main">
+					<div class="notes-placeholder" id="notes-placeholder">
+						<Icon name="material-symbols:edit-note" is:inline />
+						<p>选择左侧的一篇笔记开始阅读</p>
+					</div>
+
+					<div class="notes-editor" id="notes-editor" hidden>
+						<div class="notes-editor__head">
+							<input
+								type="text"
+								id="notes-editor-title"
+								class="notes-editor__title"
+								placeholder="文章标题"
+								aria-label="文章标题"
+							/>
+							<div class="notes-editor__tools">
+								<button type="button" class="notes-btn notes-btn--primary" id="notes-editor-save">
+									<Icon name="material-symbols:save-rounded" is:inline />
+									<span>保存</span>
+								</button>
+								<button type="button" class="notes-btn" id="notes-editor-cancel">取消</button>
+							</div>
+						</div>
+						<div class="notes-editor__meta">
+							<input
+								type="text"
+								id="notes-editor-tags"
+								class="notes-editor__tags"
+								list="notes-editor-tag-options"
+								placeholder="标签：生活随笔 / 技术分享（多个用逗号分隔）"
+								aria-label="标签"
+							/>
+							<datalist id="notes-editor-tag-options">
+								{noteTagOptions.map((tag) => <option value={tag} />)}
+							</datalist>
+						</div>
+						<div class="notes-editor__cover">
+							<input id="notes-cover-input" type="file" accept="image/*" hidden />
+							<button type="button" class="notes-btn" id="notes-cover-btn">设置封面</button>
+							<img id="notes-cover-preview" class="notes-editor__cover-preview" alt="封面预览" hidden />
+							<span class="notes-editor__cover-name" id="notes-cover-name">未设置封面，文章列表使用默认封面</span>
+							<button type="button" class="notes-btn notes-btn--danger" id="notes-cover-remove" hidden>移除</button>
+						</div>
+						<textarea
+							id="notes-editor-body"
+							class="notes-editor__body"
+							placeholder="在这里用 Markdown 写文章…"
+							spellcheck="false"
+						></textarea>
+						<p class="notes-editor__hint">
+							支持 Markdown 与代码块；保存后只存在这台设备的浏览器里，可用「导出 md」下载。
+						</p>
+					</div>
+
+					<article class="notes-doc" id="notes-doc" hidden>
+						<header class="notes-doc__head">
+							<h2 class="notes-doc__title" id="notes-doc-title"></h2>
+							<div class="notes-doc__meta">
+								<span id="notes-doc-date"></span>
+								<span id="notes-doc-words"></span>
+								<span class="notes-doc__tags" id="notes-doc-tags"></span>
+								<span title="保存后这篇笔记也会出现在文章列表">已同步到文章列表</span>
+							</div>
+							<div class="notes-doc__tools">
+								<button type="button" class="notes-btn" id="notes-edit-btn">
+									<Icon name="material-symbols:edit-rounded" is:inline />
+									<span>编辑</span>
+								</button>
+								<button type="button" class="notes-btn" id="notes-export-btn">
+									<Icon name="material-symbols:download-rounded" is:inline />
+									<span>导出 md</span>
+								</button>
+								<button type="button" class="notes-btn notes-btn--danger" id="notes-delete-btn">
+									<Icon name="material-symbols:delete-outline-rounded" is:inline />
+									<span>删除</span>
+								</button>
+							</div>
+						</header>
+						<div class="notes-content custom-md" id="notes-content" data-pagefind-ignore></div>
+					</article>
+				</section>
+
+				<div class="notes-drop" id="notes-drop" aria-hidden="true">
+					<Icon name="material-symbols:upload-file-rounded" is:inline />
+					<span>松开即可导入 md</span>
+				</div>
+				<div class="notes-toast" id="notes-toast" role="status" aria-live="polite"></div>
+<script>
+	import DOMPurify from "dompurify";
+	import { marked } from "marked";
+	import {
+		composeNote,
+		deleteNote,
+		getNoteImage,
+		listNoteImages,
+		listNotes,
+		normalizeNoteImageName,
+		parseNoteFile,
+		saveNote,
+		saveNoteImages,
+		type NoteRecord,
+	} from "@/utils/notes-store";
+		import {
+			buildFrontmatter,
+			downloadPublishBundle,
+			imageExtension,
+			sanitizeFileName,
+			toDateOnly,
+			yamlString,
+			type ExportImage,
+		} from "@/utils/publish-export";
+
+	type Hljs = {
+		getLanguage: (name: string) => boolean;
+		highlight: (code: string, options: { language: string }) => { value: string };
+		highlightAuto: (code: string) => { value: string };
+	};
+
+	let abort: AbortController | null = null;
+	let hljsRef: Hljs | null = null;
+	let hljsPromise: Promise<Hljs | null> | null = null;
+	let lightCssRef: HTMLLinkElement | null = null;
+	let darkCssRef: HTMLLinkElement | null = null;
+	let themeObserver: MutationObserver | null = null;
+
+	function syncHighlightTheme() {
+		const dark = document.documentElement.classList.contains("dark");
+		if (lightCssRef) lightCssRef.disabled = dark;
+		if (darkCssRef) darkCssRef.disabled = !dark;
+	}
+
+	function watchHighlightTheme() {
+		syncHighlightTheme();
+		if (themeObserver) themeObserver.disconnect();
+		themeObserver = new MutationObserver(syncHighlightTheme);
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+	}
+
+	function escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
+	}
+
+	function loadHighlight(): Promise<Hljs | null> {
+		const existing = (window as unknown as { hljs?: Hljs }).hljs;
+		if (existing) {
+			// 主题样式可能在首次请求前已注入，确保当前主题正确
+			if (!lightCssRef || !darkCssRef) ensureHighlightStyles();
+			watchHighlightTheme();
+			return Promise.resolve(existing);
+		}
+		if (hljsPromise) {
+			hljsPromise.then(() => watchHighlightTheme());
+			return hljsPromise;
+		}
+
+		function ensureHighlightStyles() {
+			const base = import.meta.env.BASE_URL;
+			if (!lightCssRef) {
+				const light = document.createElement("link");
+				light.rel = "stylesheet";
+				light.href = `${base}assets/css/highlight-github.min.css`;
+				light.id = "notes-hljs-css-light";
+				document.head.appendChild(light);
+				lightCssRef = light;
+			}
+			if (!darkCssRef) {
+				const dark = document.createElement("link");
+				dark.rel = "stylesheet";
+				dark.href = `${base}assets/css/highlight-github-dark.min.css`;
+				dark.id = "notes-hljs-css-dark";
+				document.head.appendChild(dark);
+				darkCssRef = dark;
+			}
+		}
+
+		ensureHighlightStyles();
+
+		hljsPromise = new Promise((resolve) => {
+			const script = document.createElement("script");
+			script.src = `${import.meta.env.BASE_URL}assets/js/highlight.min.js`;
+			script.onload = () => {
+				hljsRef = (window as unknown as { hljs?: Hljs }).hljs ?? null;
+				watchHighlightTheme();
+				resolve(hljsRef);
+			};
+			script.onerror = () => resolve(null);
+			document.head.appendChild(script);
+		});
+		return hljsPromise;
+	}
+
+	const renderer = new marked.Renderer();
+	renderer.code = ({ text, lang }) => {
+		const language = (lang || "").trim().split(/\s+/)[0];
+		let highlighted = escapeHtml(text);
+		if (hljsRef) {
+			try {
+				highlighted =
+					language && hljsRef.getLanguage(language)
+						? hljsRef.highlight(text, { language }).value
+						: hljsRef.highlightAuto(text).value;
+			} catch {
+				highlighted = escapeHtml(text);
+			}
+		}
+		return `<pre class="note-pre" data-lang="${escapeHtml(language || "text")}"><code class="hljs">${highlighted}</code></pre>`;
+	};
+	renderer.image = ({ href, title, text }) => {
+		const src = escapeHtml(href.replace(/\\/g, "/"));
+		const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+		return `<img src="${src}" alt="${escapeHtml(text)}"${titleAttr}>`;
+	};
+
+	/** 给代码块加上 macOS 窗口栏与行号（行号按固定行高与代码逐行对齐） */
+	function decorateCodeBlocks(root: HTMLElement) {
+		root.querySelectorAll<HTMLPreElement>("pre.note-pre").forEach((pre) => {
+			const code = pre.querySelector("code");
+			const language = pre.dataset.lang || "text";
+			const lineCount = Math.max(1, (code?.textContent ?? "").split("\n").length);
+
+			const wrapper = document.createElement("div");
+			wrapper.className = "note-code";
+			wrapper.dataset.lang = language;
+
+			const head = document.createElement("div");
+			head.className = "note-code__head";
+			head.title = language;
+			const dots = document.createElement("span");
+			dots.className = "note-code__dots";
+			dots.setAttribute("aria-hidden", "true");
+			for (const tone of ["red", "yellow", "green"]) {
+				const dot = document.createElement("span");
+				dot.className = `note-code__dot note-code__dot--${tone}`;
+				dots.appendChild(dot);
+			}
+			head.appendChild(dots);
+
+			const body = document.createElement("div");
+			body.className = "note-code__body";
+
+			const gutter = document.createElement("div");
+			gutter.className = "note-code__gutter";
+			gutter.setAttribute("aria-hidden", "true");
+			for (let i = 1; i <= lineCount; i++) {
+				const line = document.createElement("span");
+				line.textContent = String(i);
+				gutter.appendChild(line);
+			}
+
+			pre.parentNode?.insertBefore(wrapper, pre);
+			body.appendChild(gutter);
+			body.appendChild(pre);
+			wrapper.appendChild(head);
+			wrapper.appendChild(body);
+		});
+	}
+
+	function renderMarkdown(markdown: string, target: HTMLElement) {
+		const html = marked.parse(markdown, {
+			renderer,
+			gfm: true,
+			async: false,
+		}) as string;
+		const sanitized = DOMPurify.sanitize(html, {
+			ADD_ATTR: ["data-lang", "target", "rel", "referrerpolicy"],
+		});
+		// 在图片进入文档前设置引用策略，避免首次请求已被图床防盗链拦截。
+		const template = document.createElement("template");
+		template.innerHTML = sanitized;
+		template.content.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
+			if (/^https?:\/\//i.test(img.getAttribute("src") ?? "")) {
+				img.setAttribute("referrerpolicy", "no-referrer");
+			}
+		});
+		target.replaceChildren(template.content);
+		target.querySelectorAll("a[href]").forEach((a) => {
+			a.setAttribute("target", "_blank");
+			a.setAttribute("rel", "noopener noreferrer");
+		});
+		decorateCodeBlocks(target);
+	}
+
+	function formatDate(ts: number): string {
+		return new Date(ts).toLocaleDateString("zh-CN", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+		});
+	}
+
+	function initNotesPage() {
+		const page = document.getElementById("notes-page");
+		if (!page) return;
+
+		abort?.abort();
+		abort = new AbortController();
+		const { signal } = abort;
+
+		const fileInput = document.getElementById("notes-file-input") as HTMLInputElement | null;
+		const uploadBtn = document.getElementById("notes-upload-btn");
+		const newBtn = document.getElementById("notes-new-btn");
+		const editorEl = document.getElementById("notes-editor");
+		const editorTitle = document.getElementById("notes-editor-title") as HTMLInputElement | null;
+		const editorBody = document.getElementById("notes-editor-body") as HTMLTextAreaElement | null;
+		const editorTags = document.getElementById("notes-editor-tags") as HTMLInputElement | null;
+		const coverInput = document.getElementById("notes-cover-input") as HTMLInputElement | null;
+		const coverBtn = document.getElementById("notes-cover-btn");
+		const coverRemove = document.getElementById("notes-cover-remove");
+		const coverPreview = document.getElementById("notes-cover-preview") as HTMLImageElement | null;
+		const coverName = document.getElementById("notes-cover-name");
+		const uploadTag = document.getElementById("notes-upload-tag") as HTMLSelectElement | null;
+		const editorSave = document.getElementById("notes-editor-save");
+		const editorCancel = document.getElementById("notes-editor-cancel");
+		const editBtn = document.getElementById("notes-edit-btn");
+		const searchInput = document.getElementById("notes-search") as HTMLInputElement | null;
+		const listEl = document.getElementById("notes-list");
+		const countEl = document.getElementById("notes-count");
+		const sideEmpty = document.getElementById("notes-side-empty");
+		const placeholder = document.getElementById("notes-placeholder");
+		const docEl = document.getElementById("notes-doc");
+		const docTitle = document.getElementById("notes-doc-title");
+		const docDate = document.getElementById("notes-doc-date");
+		const docWords = document.getElementById("notes-doc-words");
+		const docTags = document.getElementById("notes-doc-tags");
+		const contentEl = document.getElementById("notes-content");
+		const exportBtn = document.getElementById("notes-export-btn");
+		const deleteBtn = document.getElementById("notes-delete-btn");
+		const dropEl = document.getElementById("notes-drop");
+		const toastEl = document.getElementById("notes-toast");
+		const libraryEl = document.getElementById("notes-library");
+		const readerSideEl = document.getElementById("notes-reader-side");
+		const tocEl = document.getElementById("notes-toc");
+		const backBtn = document.getElementById("notes-back-btn");
+
+		if (!listEl || !contentEl || !docEl) return;
+
+		let notes: NoteRecord[] = [];
+		let currentId: string | null = null;
+		let keyword = "";
+		let toastTimer = 0;
+		/** null 表示正在新建；有值表示正在编辑已有笔记 */
+		let editingId: string | null = null;
+		let pendingCoverFile: File | null = null;
+		let editorCoverName = "";
+		let coverPreviewUrl = "";
+		let coverPreviewVersion = 0;
+		let objectUrls: string[] = [];
+		/** 文章列表跳转过来时待打开的笔记（?n=id&edit=1） */
+		let pendingEditId: string | null = null;
+		/** 记录已经处理过的 query，避免保存/删除后重复跳转 */
+		let lastQueryHandled = "";
+
+		function toast(message: string) {
+			if (!toastEl) return;
+			toastEl.textContent = message;
+			toastEl.classList.add("is-visible");
+			window.clearTimeout(toastTimer);
+			toastTimer = window.setTimeout(() => toastEl.classList.remove("is-visible"), 2200);
+		}
+
+		const isImageFile = (file: File) =>
+			file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(file.name);
+
+		/** 把标题写回 frontmatter：已有 frontmatter 就替换/补一行，没有就新建一段 */
+		function applyTitleToRaw(raw: string, title: string): string {
+			const value = title.replace(/\r?\n/g, " ").trim();
+			const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+			if (!fm) {
+				return `---\ntitle: ${value}\n---\n\n${raw.replace(/^\s+/, "")}`;
+			}
+			const lines = fm[1].split(/\r?\n/);
+			let replaced = false;
+			const next = lines.map((line) => {
+				if (/^title\s*:/.test(line)) {
+					replaced = true;
+					return `title: ${value}`;
+				}
+				return line;
+			});
+			if (!replaced) next.unshift(`title: ${value}`);
+			return `---\n${next.join("\n")}\n---\n` + raw.slice(fm[0].length);
+		}
+
+		/** 把标签写回 frontmatter（tags: [a, b]）：空标签则移除该字段 */
+		function applyTagsToRaw(raw: string, tags: string[]): string {
+			const value = tags.join(", ");
+			const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+			if (!fm) {
+				return value
+					? `---\ntags: [${value}]\n---\n\n${raw.replace(/^\s+/, "")}`
+					: raw;
+			}
+			// 同时清掉块状写法（tags: 下面缩进的 - xxx 行），避免导出后 YAML 残留
+			const lines: string[] = [];
+			let skipping = false;
+			for (const line of fm[1].split(/\r?\n/)) {
+				if (/^tags\s*:/.test(line)) {
+					skipping = true;
+					continue;
+				}
+				if (skipping && /^\s*-\s/.test(line)) continue;
+				skipping = false;
+				lines.push(line);
+			}
+			if (value) lines.push(`tags: [${value}]`);
+			return `---\n${lines.join("\n")}\n---\n` + raw.slice(fm[0].length);
+		}
+
+		/** 封面统一写入 image 字段，导出成正式文章后也能继续使用。 */
+		function applyCoverToRaw(raw: string, cover: string): string {
+			const value = cover.replace(/\r?\n/g, " ").trim();
+			const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+			if (!fm) {
+				return value
+					? `---\nimage: ${value}\n---\n\n${raw.replace(/^\s+/, "")}`
+					: raw;
+			}
+			const lines: string[] = [];
+			let replaced = false;
+			for (const line of fm[1].split(/\r?\n/)) {
+				if (/^(image|cover)\s*:/.test(line)) {
+					if (value && !replaced) lines.push(`image: ${value}`);
+					replaced = true;
+					continue;
+				}
+				lines.push(line);
+			}
+			if (value && !replaced) lines.push(`image: ${value}`);
+			return `---\n${lines.join("\n")}\n---\n` + raw.slice(fm[0].length);
+		}
+
+		/** 由标题生成不重复的笔记 id（文件名） */
+		function uniqueId(title: string, excludeId?: string | null): string {
+			const base =
+				title
+					.trim()
+					.replace(/[\\/:*?"<>|]/g, "-")
+					.slice(0, 60) || "未命名笔记";
+			const taken = new Set(notes.map((n) => n.id));
+			if (excludeId) taken.delete(excludeId);
+			if (!taken.has(base)) return base;
+			let index = 2;
+			while (taken.has(`${base} ${index}`)) index += 1;
+			return `${base} ${index}`;
+		}
+
+		function releaseObjectUrls() {
+			objectUrls.forEach((url) => URL.revokeObjectURL(url));
+			objectUrls = [];
+		}
+
+		/** 把存在 IndexedDB 里的图片按文件名匹配到正文里的相对路径 */
+		async function applyNoteImages(root: HTMLElement, noteId: string) {
+			releaseObjectUrls();
+			let images: Awaited<ReturnType<typeof listNoteImages>> = [];
+			try {
+				images = await listNoteImages(noteId);
+			} catch {
+				return;
+			}
+
+			const map = new Map<string, string>();
+			const withoutExtension = new Map<string, string>();
+			for (const item of images) {
+				const url = URL.createObjectURL(item.blob);
+				objectUrls.push(url);
+				const name = normalizeNoteImageName(item.name);
+				map.set(name, url);
+				const stem = name.replace(/\.[^.]+$/, "");
+				if (!withoutExtension.has(stem)) withoutExtension.set(stem, url);
+			}
+
+			root.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
+				const src = img.getAttribute("src") ?? "";
+				img.loading = "lazy";
+				img.decoding = "async";
+				if (/^https?:\/\//i.test(src)) {
+					// 语雀等图床会按 Referer 防盗链，本地阅读时不发送来源。
+					img.referrerPolicy = "no-referrer";
+					return;
+				}
+				if (!src || /^(data:|blob:|\/\/)/i.test(src)) return;
+				const base = normalizeNoteImageName(src);
+				const stem = base.replace(/\.[^.]+$/, "");
+				const url = map.get(base) ?? withoutExtension.get(stem);
+				if (!url) return;
+				img.src = url;
+				img.removeAttribute("srcset");
+			});
+		}
+
+		async function refreshCoverPreview() {
+			const version = ++coverPreviewVersion;
+			if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+			coverPreviewUrl = "";
+			if (coverPreview) {
+				coverPreview.hidden = true;
+				coverPreview.removeAttribute("src");
+			}
+			if (coverName) {
+				coverName.textContent = editorCoverName || "未设置封面，文章列表使用默认封面";
+			}
+			if (coverRemove) coverRemove.hidden = !editorCoverName;
+
+			let blob: Blob | null = pendingCoverFile;
+			if (!blob && editingId && editorCoverName) {
+				try {
+					blob = (await getNoteImage(editingId, editorCoverName))?.blob ?? null;
+				} catch {
+					blob = null;
+				}
+			}
+			if (!blob || version !== coverPreviewVersion) return;
+			const url = URL.createObjectURL(blob);
+			coverPreviewUrl = url;
+			if (coverPreview) {
+				coverPreview.src = url;
+				coverPreview.hidden = false;
+			}
+		}
+
+		function showLibrary() {
+			if (libraryEl) libraryEl.hidden = false;
+			if (readerSideEl) readerSideEl.hidden = true;
+		}
+
+		function showReaderToc() {
+			if (libraryEl) libraryEl.hidden = true;
+			if (readerSideEl) readerSideEl.hidden = false;
+		}
+
+		type NotesTocNode = {
+			heading: HTMLElement;
+			children: NotesTocNode[];
+		};
+
+		function renderToc() {
+			if (!tocEl || !contentEl) return;
+			tocEl.replaceChildren();
+			const headings = Array.from(
+				contentEl.querySelectorAll<HTMLElement>("h1, h2, h3, h4"),
+			);
+			if (headings.length === 0) {
+				const empty = document.createElement("p");
+				empty.className = "notes-toc__empty";
+				empty.textContent = "这篇笔记没有小节标题";
+				tocEl.appendChild(empty);
+				return;
+			}
+
+			headings.forEach((heading, index) => {
+				if (!heading.id) heading.id = `note-section-${index + 1}`;
+			});
+
+			const root: NotesTocNode[] = [];
+			const stack: Array<{ depth: number; node: NotesTocNode }> = [];
+			headings.forEach((heading) => {
+				const depth = Number(heading.tagName.slice(1));
+				const node: NotesTocNode = { heading, children: [] };
+				while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+					stack.pop();
+				}
+				if (stack.length > 0) {
+					stack[stack.length - 1].node.children.push(node);
+				} else {
+					root.push(node);
+				}
+				stack.push({ depth, node });
+			});
+
+			const renderTocList = (nodes: NotesTocNode[], isRoot: boolean) => {
+				const list = document.createElement("ul");
+				list.className = isRoot
+					? "notes-toc__list"
+					: "notes-toc__list notes-toc__sublist";
+
+				nodes.forEach((node) => {
+					const depth = Number(node.heading.tagName.slice(1));
+					const item = document.createElement("li");
+					item.className = "notes-toc__item";
+					item.dataset.depth = String(depth);
+
+					const row = document.createElement("div");
+					row.className = "notes-toc__row";
+
+					if (node.children.length > 0) {
+						const toggle = document.createElement("button");
+						toggle.type = "button";
+						toggle.className = "notes-toc__toggle";
+						toggle.setAttribute("aria-expanded", "true");
+						toggle.setAttribute("aria-label", "展开或收起子标题");
+						toggle.textContent = "▾";
+						row.appendChild(toggle);
+					} else {
+						const spacer = document.createElement("span");
+						spacer.className = "notes-toc__spacer";
+						spacer.setAttribute("aria-hidden", "true");
+						row.appendChild(spacer);
+					}
+
+					const link = document.createElement("a");
+					link.href = `#${node.heading.id}`;
+					link.className = "notes-toc__link";
+					link.dataset.depth = String(depth);
+					link.textContent =
+						node.heading.textContent?.trim() || `小节 ${depth} 级标题`;
+					link.addEventListener("click", (event) => {
+						event.preventDefault();
+						node.heading.scrollIntoView({
+							behavior: "smooth",
+							block: "start",
+						});
+					});
+					row.appendChild(link);
+					item.appendChild(row);
+
+					if (node.children.length > 0) {
+						const sublist = renderTocList(node.children, false);
+						item.appendChild(sublist);
+						const toggle =
+							row.querySelector<HTMLButtonElement>(".notes-toc__toggle");
+						toggle?.addEventListener("click", (event) => {
+							event.preventDefault();
+							event.stopPropagation();
+							const expanded =
+								toggle.getAttribute("aria-expanded") !== "false";
+							toggle.setAttribute("aria-expanded", String(!expanded));
+							sublist.hidden = expanded;
+							toggle.textContent = expanded ? "▸" : "▾";
+						});
+					}
+
+					list.appendChild(item);
+				});
+
+				return list;
+			};
+
+			tocEl.appendChild(renderTocList(root, true));
+		}
+
+		function openEditor(note?: NoteRecord) {
+			if (!editorEl || !editorTitle || !editorBody) {
+				toast("编辑器加载失败，请刷新页面");
+				return;
+			}
+			editingId = note?.id ?? null;
+			pendingCoverFile = null;
+			editorCoverName = note?.cover ?? "";
+			if (coverInput) coverInput.value = "";
+			editorTitle.value = note?.title ?? "";
+			editorBody.value = note?.body ?? "";
+			if (editorTags) editorTags.value = note ? note.tags.join(", ") : "";
+			void refreshCoverPreview();
+			if (placeholder) placeholder.hidden = true;
+			docEl!.hidden = true;
+			showLibrary();
+			editorEl.hidden = false;
+			editorTitle.focus();
+			if (window.matchMedia("(max-width: 768px)").matches) {
+				document
+					.getElementById("notes-main")
+					?.scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+		}
+
+		function closeEditor() {
+			if (editorEl) editorEl.hidden = true;
+			editingId = null;
+			pendingCoverFile = null;
+			editorCoverName = "";
+			void refreshCoverPreview();
+			if (!currentId) {
+				docEl!.hidden = true;
+				if (placeholder) placeholder.hidden = false;
+				showLibrary();
+				return;
+			}
+			docEl!.hidden = false;
+			showReaderToc();
+			if (placeholder) placeholder.hidden = true;
+		}
+
+		async function saveEditor() {
+			if (!editorEl || !editorTitle || !editorBody) return;
+			const title = editorTitle.value.trim();
+			if (!title) {
+				toast("先给文章起个标题");
+				editorTitle.focus();
+				return;
+			}
+
+			const existing = editingId ? notes.find((n) => n.id === editingId) : undefined;
+			const id = existing ? existing.id : uniqueId(title);
+			const coverFile = pendingCoverFile;
+			const cover = editorCoverName;
+			const bodyText = editorBody.value.replace(/^\s*\n/, "");
+			const tags = (editorTags?.value ?? "")
+				.split(/[,，、\s]+/)
+				.map((tag) => tag.replace(/^#/, "").trim())
+				.filter(Boolean);
+
+			let raw = bodyText;
+			if (existing) {
+				const fm = existing.raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+				raw = fm ? fm[0] + bodyText : bodyText;
+			}
+			raw = applyTitleToRaw(raw, title);
+			raw = applyTagsToRaw(raw, tags);
+			raw = applyCoverToRaw(raw, cover);
+
+			try {
+				if (coverFile) await saveNoteImages(id, [coverFile]);
+				await saveNote(composeNote(id, raw, existing?.createdAt));
+			} catch {
+				toast("保存失败，可能是浏览器存储空间不足");
+				return;
+			}
+
+			currentId = id;
+			closeEditor();
+			await reload(id);
+			toast(existing ? "已保存" : "已新建文章");
+		}
+
+		function filteredNotes(): NoteRecord[] {
+			if (!keyword) return notes;
+			const kw = keyword.toLowerCase();
+			return notes.filter(
+				(n) =>
+					n.title.toLowerCase().includes(kw) || n.body.toLowerCase().includes(kw),
+			);
+		}
+
+		function renderList() {
+			const visible = filteredNotes();
+			listEl!.innerHTML = "";
+			if (countEl) countEl.textContent = String(notes.length);
+
+			visible.forEach((note) => {
+				const li = document.createElement("li");
+				li.className = "notes-item";
+				if (note.id === currentId) li.classList.add("is-active");
+
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "notes-item__btn";
+				btn.addEventListener("click", () => openNote(note.id));
+
+				const title = document.createElement("span");
+				title.className = "notes-item__title";
+				title.textContent = note.title;
+
+				const meta = document.createElement("span");
+				meta.className = "notes-item__meta";
+				meta.textContent = `${formatDate(note.updatedAt)} · ${note.words} 字`;
+
+				btn.appendChild(title);
+				btn.appendChild(meta);
+				li.appendChild(btn);
+				listEl!.appendChild(li);
+			});
+
+			const isEmpty = visible.length === 0;
+			if (sideEmpty) sideEmpty.hidden = !isEmpty;
+			if (isEmpty && notes.length > 0) {
+				if (sideEmpty) sideEmpty.textContent = "没有匹配的笔记";
+			} else if (sideEmpty) {
+				sideEmpty.textContent = "还没有笔记。点「写文章」开始，或上传 md。";
+			}
+			listEl!.hidden = isEmpty;
+		}
+
+		async function openNote(id: string) {
+			const note = notes.find((n) => n.id === id);
+			if (!note) return;
+
+			if (editorEl && !editorEl.hidden) {
+				const dirty = `${editorTitle?.value.trim() ?? ""}${editorBody?.value.trim() ?? ""}`;
+				if (dirty && !window.confirm("放弃当前未保存的内容？")) return;
+				editorEl.hidden = true;
+				editingId = null;
+			}
+
+			currentId = id;
+			renderList();
+			showReaderToc();
+
+			if (placeholder) placeholder.hidden = true;
+			docEl!.hidden = false;
+			if (docTitle) docTitle.textContent = note.title;
+			if (docDate) docDate.textContent = formatDate(note.updatedAt);
+			if (docWords) docWords.textContent = `${note.words} 字`;
+			if (docTags) {
+				docTags.innerHTML = "";
+				note.tags.forEach((tag) => {
+					const chip = document.createElement("span");
+					chip.className = "notes-tag";
+					chip.textContent = `#${tag}`;
+					docTags.appendChild(chip);
+				});
+			}
+
+			contentEl!.innerHTML = '<p class="notes-loading">正在渲染…</p>';
+			await loadHighlight();
+			renderMarkdown(note.body, contentEl!);
+			renderToc();
+			await applyNoteImages(contentEl!, note.id);
+			if (window.matchMedia("(max-width: 768px)").matches) {
+				document
+					.getElementById("notes-main")
+					?.scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+		}
+
+		async function reload(selectId?: string) {
+			try {
+				notes = await listNotes();
+			} catch {
+				toast("浏览器不支持本地存储（IndexedDB 被禁用？）");
+				return;
+			}
+
+			// 支持从文章列表跳转：/notes/?n=<id>，带 edit=1 时直接打开编辑器
+			const params = new URLSearchParams(location.search);
+			const queryKey = params.toString();
+			const target = params.get("n");
+			if (queryKey !== lastQueryHandled && target && notes.some((n) => n.id === target)) {
+				lastQueryHandled = queryKey;
+				selectId = target;
+				if (params.get("edit") === "1") pendingEditId = target;
+			}
+
+			if (selectId && notes.some((n) => n.id === selectId)) {
+				currentId = selectId;
+			}
+			if (currentId && !notes.some((n) => n.id === currentId)) {
+				currentId = null;
+			}
+
+			renderList();
+
+			if (currentId) {
+				await openNote(currentId);
+				if (pendingEditId === currentId) {
+					pendingEditId = null;
+					const note = notes.find((n) => n.id === currentId);
+					if (note) openEditor(note);
+				}
+				return;
+			}
+			const visible = filteredNotes();
+			if (visible.length > 0) {
+				await openNote(visible[0].id);
+				return;
+			}
+			if (placeholder) placeholder.hidden = false;
+			docEl!.hidden = true;
+			contentEl!.innerHTML = "";
+			tocEl?.replaceChildren();
+			showLibrary();
+		}
+
+		async function importFiles(files: File[]) {
+			const mdFiles = files.filter((f) => /\.(md|markdown)$/i.test(f.name));
+			const imageFiles = files.filter(isImageFile);
+			if (mdFiles.length === 0 && imageFiles.length === 0) {
+				toast("只支持 .md / .markdown / 图片文件");
+				return;
+			}
+
+			let lastId = "";
+			const selectedTag = uploadTag?.value ?? "";
+			for (const file of mdFiles) {
+				let raw = await file.text();
+				if (selectedTag) raw = applyTagsToRaw(raw, [selectedTag]);
+				const note = parseNoteFile(file.name, raw);
+				const existing = notes.find((n) => n.id === note.id);
+				if (existing) note.createdAt = existing.createdAt;
+				try {
+					await saveNote(note);
+					lastId = note.id;
+				} catch {
+					toast("写入失败，可能是浏览器存储空间不足");
+					return;
+				}
+			}
+
+			// 只有图片：挂到当前打开的笔记（或正在编辑的笔记）上
+			if (imageFiles.length > 0 && !lastId) {
+				const targetId = editingId || currentId;
+				if (!targetId) {
+					toast("先打开或新建一篇笔记，再上传图片");
+					return;
+				}
+				const saved = await saveNoteImages(targetId, imageFiles);
+				if (editorEl && !editorEl.hidden) {
+					toast(`已保存 ${saved} 张图片，保存文章后即可显示`);
+					return;
+				}
+				await reload(targetId);
+				toast(`已保存 ${saved} 张图片`);
+				return;
+			}
+
+			if (lastId) {
+				const saved =
+					imageFiles.length > 0 ? await saveNoteImages(lastId, imageFiles) : 0;
+				await reload(lastId);
+				// 导入后立刻打开编辑器，让用户顺手补封面和标签
+				const imported = notes.find((note) => note.id === lastId);
+				if (imported) openEditor(imported);
+				toast(
+					saved > 0
+						? `已上传，请设置封面和标签，保存后会出现在文章列表（另存 ${saved} 张图片）`
+						: "已上传，请设置封面和标签，保存后会出现在文章列表",
+				);
+			}
+		}
+
+		backBtn?.addEventListener(
+			"click",
+			() => {
+				currentId = null;
+				docEl!.hidden = true;
+				if (placeholder) placeholder.hidden = false;
+				contentEl!.replaceChildren();
+				tocEl?.replaceChildren();
+				releaseObjectUrls();
+				showLibrary();
+				renderList();
+				const nextUrl = new URL(location.href);
+				nextUrl.searchParams.delete("n");
+				nextUrl.searchParams.delete("edit");
+				history.replaceState(null, "", nextUrl);
+			},
+			{ signal },
+		);
+
+		coverBtn?.addEventListener("click", () => coverInput?.click(), { signal });
+		coverInput?.addEventListener(
+			"change",
+			() => {
+				const file = coverInput.files?.[0];
+				coverInput.value = "";
+				if (!file) return;
+				if (!isImageFile(file)) {
+					toast("封面必须是图片文件");
+					return;
+				}
+				pendingCoverFile = file;
+				editorCoverName = file.name;
+				void refreshCoverPreview();
+			},
+			{ signal },
+		);
+		coverRemove?.addEventListener(
+			"click",
+			() => {
+				pendingCoverFile = null;
+				editorCoverName = "";
+				void refreshCoverPreview();
+			},
+			{ signal },
+		);
+
+		newBtn?.addEventListener("click", () => openEditor(), { signal });
+		editorSave?.addEventListener("click", () => void saveEditor(), { signal });
+		editorCancel?.addEventListener("click", () => closeEditor(), { signal });
+		editBtn?.addEventListener(
+			"click",
+			() => {
+				const note = notes.find((n) => n.id === currentId);
+				if (!note) return;
+				openEditor(note);
+			},
+			{ signal },
+		);
+
+		editorBody?.addEventListener(
+			"keydown",
+			(e) => {
+				if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+					e.preventDefault();
+					void saveEditor();
+				}
+			},
+			{ signal },
+		);
+
+		editorTitle?.addEventListener(
+			"keydown",
+			(e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					editorBody?.focus();
+				}
+			},
+			{ signal },
+		);
+
+		uploadBtn?.addEventListener("click", () => fileInput?.click(), { signal });
+
+		fileInput?.addEventListener(
+			"change",
+			async () => {
+				const files = Array.from(fileInput.files ?? []);
+				fileInput.value = "";
+				if (files.length > 0) await importFiles(files);
+			},
+			{ signal },
+		);
+
+		searchInput?.addEventListener(
+			"input",
+			() => {
+				keyword = searchInput.value.trim();
+				renderList();
+			},
+			{ signal },
+		);
+
+		/** 导出前补齐可发布的 frontmatter：缺 title / published / tags 时补上 */
+		function ensurePublishableFrontmatter(raw: string, note: NoteRecord): string {
+			const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(raw);
+			if (!match) {
+				return `${buildFrontmatter({
+					title: note.title,
+					published: { raw: toDateOnly(note.createdAt) },
+					tags: note.tags,
+					downloadable: { raw: "true" },
+				})}\n${raw}`;
+			}
+
+			let fields = match[1];
+			if (!/^published\s*:/m.test(fields)) {
+				fields += `\npublished: ${toDateOnly(note.createdAt)}`;
+			}
+			// 笔记是唯一允许访客下载的内容；普通文章不加这个标记
+			if (!/^downloadable\s*:/m.test(fields)) {
+				fields += "\ndownloadable: true";
+			}
+			if (!/^title\s*:/m.test(fields)) {
+				fields = `title: ${yamlString(note.title)}\n${fields}`;
+			}
+			if (!/^tags\s*:/m.test(fields) && note.tags.length > 0) {
+				fields += `\ntags:\n${note.tags
+					.map((tag) => `  - ${yamlString(tag)}`)
+					.join("\n")}`;
+			}
+
+			return `---\n${fields}\n---\n\n${raw.slice(match[0].length)}`;
+		}
+
+		/** 导出为可发布 Markdown：连同笔记图片一起下载，图片引用改为相对路径 */
+		async function exportNote(note: NoteRecord) {
+			try {
+				const base = sanitizeFileName(note.title || note.id);
+				const stored = await listNoteImages(note.id);
+				const files: ExportImage[] = [];
+				let raw = note.raw;
+
+				stored.forEach((image, index) => {
+					const newName = `${base}-${index + 1}.${imageExtension(image.blob, image.name)}`;
+					files.push({ name: newName, blob: image.blob });
+
+					// 把 md 里对旧图片名的引用替换成导出的新文件名（保留原来的 ./ 前缀）
+					const pattern = new RegExp(
+						image.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+						"gi",
+					);
+					raw = raw.replace(pattern, newName);
+				});
+
+				raw = ensurePublishableFrontmatter(raw, note);
+
+				const result = downloadPublishBundle(raw, base, files);
+				toast(
+					`已导出 ${result.markdownName}${
+						result.imageCount > 0 ? ` + ${result.imageCount} 张图片` : ""
+					}，放进 src/content/文章/ 后重新构建即可公开`,
+				);
+			} catch {
+				toast("导出失败，请稍后重试");
+			}
+		}
+
+		exportBtn?.addEventListener(
+			"click",
+			() => {
+				const note = notes.find((n) => n.id === currentId);
+				if (!note) return;
+				void exportNote(note);
+			},
+			{ signal },
+		);
+
+		deleteBtn?.addEventListener(
+			"click",
+			async () => {
+				const note = notes.find((n) => n.id === currentId);
+				if (!note) return;
+				if (!window.confirm(`删除「${note.title}」？该操作不可恢复。`)) return;
+				await deleteNote(note.id);
+				currentId = null;
+				await reload();
+				toast("已删除");
+			},
+			{ signal },
+		);
+
+		// 拖拽导入
+		let dragDepth = 0;
+		page.addEventListener(
+			"dragenter",
+			(e) => {
+				if (!e.dataTransfer?.types.includes("Files")) return;
+				dragDepth += 1;
+				dropEl?.classList.add("is-visible");
+			},
+			{ signal },
+		);
+		page.addEventListener(
+			"dragover",
+			(e) => {
+				e.preventDefault();
+				if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+			},
+			{ signal },
+		);
+		page.addEventListener(
+			"dragleave",
+			() => {
+				dragDepth = Math.max(0, dragDepth - 1);
+				if (dragDepth === 0) dropEl?.classList.remove("is-visible");
+			},
+			{ signal },
+		);
+		page.addEventListener(
+			"drop",
+			async (e) => {
+				e.preventDefault();
+				dragDepth = 0;
+				dropEl?.classList.remove("is-visible");
+				const files = Array.from(e.dataTransfer?.files ?? []);
+				if (files.length > 0) await importFiles(files);
+			},
+			{ signal },
+		);
+
+		reload();
+	}
+
+	initNotesPage();
+	document.addEventListener("astro:page-load", initNotesPage);
+	document.addEventListener("swup:content:replaced", initNotesPage);
+</script>
+
+			</div>
+			)}
+		</div>
+	</div>
+</MainGridLayout>

@@ -1,0 +1,1863 @@
+---
+import { Image } from "astro:assets";
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import MomentCard from "@/components/moments/MomentCard.astro";
+import MomentCommentChat from "@/components/moments/MomentCommentChat.svelte";
+import MomentsCover from "@/components/moments/MomentsCover.astro";
+import { commentConfig } from "@/config";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import { isPublicMoment } from "@/utils/content-utils";
+import {
+	resolveMomentMedia,
+	stripMomentMedia,
+	toMomentPlainText,
+} from "@/utils/moment-media";
+import "../styles/pages/moments-filter.css";
+
+const walineServerURL = commentConfig.waline?.serverURL || "";
+
+const moments = await getCollection("moments", ({ data }) =>
+	isPublicMoment(data),
+);
+const sortedMoments = moments
+	.filter((m) => !m.data.pinned)
+	.sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
+
+// 置顶说说
+const pinnedMoments = moments
+	.filter((m) => m.data.pinned)
+	.sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
+
+// 获取 moments 资产目录下的所有图片
+const momentAssets = import.meta.glob<{ default: ImageMetadata }>(
+	"../content/动态/**/*.{jpeg,jpg,png,gif,webp,avif}",
+	{ eager: true },
+);
+
+// 解析图片路径
+const parseImages = (
+	imagesData: (ImageMetadata | string)[] | string | undefined,
+): (string | ImageMetadata)[] => {
+	let rawPaths: string[] = [];
+	if (Array.isArray(imagesData)) {
+		rawPaths = imagesData.map((img) =>
+			typeof img === "string" ? img : img.src,
+		);
+	} else if (typeof imagesData === "string" && imagesData.trim()) {
+		rawPaths = imagesData
+			.split(/[,;]/)
+			.map((img) => img.trim())
+			.filter((img) => img);
+	}
+
+	return Array.from(new Set(rawPaths))
+		.map((img) => {
+			if (
+				img.startsWith("http://") ||
+				img.startsWith("https://") ||
+				img.startsWith("/")
+			) {
+				return img;
+			}
+			const cleanPath = img.replace(/^\.\//, "");
+			if (cleanPath.startsWith("assets/")) {
+				const fileName = cleanPath.replace("assets/", "");
+				for (const path in momentAssets) {
+					if (path.endsWith(fileName)) {
+						return momentAssets[path].default;
+					}
+				}
+			}
+			return img;
+		})
+		.filter((img) => img);
+};
+
+// 预处理置顶说说
+const pinnedData = pinnedMoments.map((m) => ({
+	images: parseImages(
+		resolveMomentMedia({ legacyImages: m.data.images, body: m.body }),
+	),
+	body: stripMomentMedia(m.body),
+	date: m.data.published,
+}));
+
+/* ---------------------------------------------------------------------------
+   筛选用数据（左栏：搜索 / 日历 / 标签）
+   全部动态都在页面上（靠 wx-feed-hidden 分批揭示），筛选纯前端完成。
+   置顶那两条也放进 feed，但它们排在**最后**、默认隐藏：这样懒加载的「前 5 条」
+   依旧是普通动态，而筛选激活时它们能作为普通项参与匹配。
+   --------------------------------------------------------------------------- */
+
+const allMoments = [...sortedMoments, ...pinnedMoments];
+
+const pad = (n: number): string => String(n).padStart(2, "0");
+
+/** 每条动态的筛选索引（与 allMoments 下标一一对应） */
+const filterIndex = allMoments.map((m) => {
+	const d = m.data.published;
+	const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	const tags = (m.data.tags ?? []).map((t) => t.trim()).filter(Boolean);
+	return {
+		tags,
+		date,
+		month: date.slice(0, 7),
+		search: [toMomentPlainText(m.body), tags.join(" "), m.data.location ?? ""]
+			.join(" ")
+			.toLowerCase(),
+	};
+});
+
+/** 日历用：每天 / 每月的动态条数 */
+const countByDate: Record<string, number> = {};
+const countByMonth: Record<string, number> = {};
+for (const item of filterIndex) {
+	countByDate[item.date] = (countByDate[item.date] ?? 0) + 1;
+	countByMonth[item.month] = (countByMonth[item.month] ?? 0) + 1;
+}
+
+/** 标签统计（按条数降序，同数量按名称） */
+const tagStats = (() => {
+	const map = new Map<string, number>();
+	for (const item of filterIndex) {
+		for (const tag of item.tags) map.set(tag, (map.get(tag) ?? 0) + 1);
+	}
+	return [...map.entries()]
+		.map(([name, count]) => ({ name, count }))
+		.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"));
+})();
+
+const now = new Date();
+const filterMeta = {
+	countByDate,
+	countByMonth,
+	currentMonth: `${now.getFullYear()}-${pad(now.getMonth() + 1)}`,
+};
+---
+
+<MainGridLayout title="动态" description="记录生活中的点点滴滴">
+  <div class="wx-layout">
+    <!-- 左栏：搜索 / 日历 / 标签（点日历与标签即时筛选右侧时间线） -->
+    <aside class="wx-filter" data-moments-filter>
+      <div class="wx-filter__block wx-filter__block--search">
+        <label class="wx-filter__search">
+          <Icon name="material-symbols:search-rounded" is:inline class="text-[1.05rem]" />
+          <input
+            type="search"
+            class="wx-filter__input"
+            placeholder="搜索动态…"
+            aria-label="搜索动态"
+            data-moments-search
+          />
+          <button
+            type="button"
+            class="wx-filter__search-clear"
+            data-moments-search-clear
+            hidden
+            aria-label="清空搜索"
+          >
+            <Icon name="material-symbols:close-rounded" class="text-[1rem]" />
+          </button>
+        </label>
+      </div>
+
+      <details class="wx-filter__block wx-filter__block--calendar wx-filter__details" open>
+        <summary class="wx-filter__summary">
+          <Icon
+            name="material-symbols:calendar-month-outline"
+            class="text-[1.05rem]"
+          />
+          <span>日历</span>
+        </summary>
+        <div class="wx-cal" data-moments-cal>
+          <div class="wx-cal__head">
+            <button
+              type="button"
+              class="wx-cal__nav"
+              data-moments-cal-prev
+              aria-label="上个月"
+            >
+              <Icon name="material-symbols:chevron-left-rounded" />
+            </button>
+            <button
+              type="button"
+              class="wx-cal__title"
+              data-moments-cal-title
+              title="点击筛选整月"
+            >
+            </button>
+            <button
+              type="button"
+              class="wx-cal__nav"
+              data-moments-cal-next
+              aria-label="下个月"
+            >
+              <Icon name="material-symbols:chevron-right-rounded" />
+            </button>
+          </div>
+          <div class="wx-cal__week">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span
+            ><span>五</span><span>六</span>
+          </div>
+          <div class="wx-cal__grid" data-moments-cal-grid></div>
+          <div class="wx-cal__foot">
+            <button
+              type="button"
+              class="wx-cal__today"
+              data-moments-cal-today
+            >
+              回到本月
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <details class="wx-filter__block wx-filter__block--tags wx-filter__details" open>
+        <summary class="wx-filter__summary">
+          <Icon name="material-symbols:tag-outline" class="text-[1.05rem]" />
+          <span>标签</span>
+        </summary>
+        <div class="wx-tags" data-moments-tags>
+          {
+            tagStats.map((tag) => (
+              <button type="button" class="wx-tag" data-moments-tag={tag.name}>
+                <span class="wx-tag__name">{tag.name}</span>
+                <span class="wx-tag__count">{tag.count}</span>
+              </button>
+            ))
+          }
+        </div>
+      </details>
+    </aside>
+
+    <!-- 右侧：封面 / 置顶 / 时间线 -->
+    <div class="wx-main">
+      <!-- 微信朋友圈风格封面 -->
+      <MomentsCover />
+
+      <!-- 发表说说：仅站长本地开发环境显示；线上访客完全只读（内容写入浏览器 IndexedDB，仅本机可见） -->
+      {import.meta.env.DEV && (
+      <form class="wx-publish" id="wx-publish">
+        <div class="wx-publish__head">
+          <img
+            class="wx-publish__avatar"
+            src="/assets/ziyuan/aurora-avatar.jpg"
+            alt="Aurora"
+            onerror="this.style.display='none'"
+          />
+          <span class="wx-publish__name">Aurora</span>
+        </div>
+        <textarea
+          id="wx-publish-text"
+          class="wx-publish__text"
+          rows="3"
+          placeholder="这一刻的想法…"
+          aria-label="说说内容"
+        ></textarea>
+        <div class="wx-publish__previews" id="wx-publish-previews" hidden></div>
+        <div class="wx-publish__row">
+          <button type="button" class="wx-publish__pick" id="wx-publish-pick">
+            <Icon name="material-symbols:add-rounded" is:inline />
+            <span>添加图片</span>
+          </button>
+          <input id="wx-publish-files" type="file" accept="image/*" multiple hidden />
+          <input
+            id="wx-publish-tags"
+            class="wx-publish__tags"
+            type="text"
+            placeholder="自定义标签，用逗号分隔"
+            aria-label="标签"
+          />
+          <label
+            class="wx-publish__private"
+            title="勾选后导出的 md 会带 private: true，构建后仅自己可见"
+          >
+            <input id="wx-publish-private" type="checkbox" />
+            <span>私密</span>
+          </label>
+          <button type="submit" class="wx-publish__submit" id="wx-publish-submit">发表</button>
+        </div>
+        <p class="wx-publish__status" id="wx-publish-status" role="status" aria-live="polite" hidden></p>
+      </form>
+      )}
+
+      <!-- 筛选状态条（无筛选时隐藏） -->
+      <div class="wx-filter-bar" data-moments-filter-bar hidden>
+        <span class="wx-filter-bar__label">筛选</span>
+        <span class="wx-filter-bar__chips" data-moments-chips></span>
+        <span class="wx-filter-bar__count" data-moments-count></span>
+        <button type="button" class="wx-filter-bar__clear" data-moments-clear>
+          清空
+        </button>
+      </div>
+
+      <!-- 置顶说说（无筛选时显示在最上面；筛选激活后隐藏，置顶内容已作为普通项参与筛选） -->
+      <a href="/moments/pinned/" class="wx-pinned" id="pinned-block" style={pinnedData.length === 0 ? 'display:none' : ''}>
+        <div class="wx-pinned-tag">
+          <span>置顶</span>
+        </div>
+        <div class="wx-pinned-items" id="pinned-items">
+          {pinnedData.map((item) => (
+            <div class="wx-pinned-preview">
+              {item.images.length > 0 ? (
+                <div class={`wx-pimgs wx-pimgs-${Math.min(item.images.length, 9)}`}>
+                  {item.images.slice(0, 9).map((img) => (
+                    typeof img === "string" ? (
+                      <img src={img} alt="" class="wx-pinned-img" loading="lazy" />
+                    ) : (
+                      <Image src={img} alt="" class="wx-pinned-img" loading="lazy" />
+                    )
+                  ))}
+                </div>
+              ) : (
+                <p class="wx-ptxt">{item.body.slice(0, 60)}{item.body.length > 60 ? '...' : ''}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </a>
+
+      <!-- 说说列表（含置顶副本：默认隐藏、仅筛选时参与匹配） -->
+      <div class="wx-feed" id="moments-feed">
+        {allMoments.length > 0 ? (
+          allMoments.map((moment, index) => {
+            const meta = filterIndex[index];
+            const isPinned = Boolean(moment.data.pinned);
+            return (
+              <div
+                class:list={[
+                  "wx-feed-item",
+                  index >= 5 && "wx-feed-hidden",
+                  isPinned && "wx-feed-pinned-copy",
+                ]}
+                data-published={moment.data.published.toISOString()}
+                data-index={index}
+                data-tags={meta.tags.join(",")}
+                data-date={meta.date}
+                data-month={meta.month}
+                data-search={meta.search}
+              >
+                <MomentCard moment={moment} />
+              </div>
+            );
+          })
+        ) : (
+          <div class="wx-empty" id="moments-empty">
+            <div class="wx-empty-icon">
+              <Icon name="material-symbols:sentiment-neutral-outline" />
+            </div>
+            <h3>还没有发布任何说说</h3>
+            <p>快去记录你的生活点滴吧</p>
+          </div>
+        )}
+      </div>
+
+      <!-- 筛选无结果时的空态 -->
+      <div class="wx-filter-empty" data-moments-empty-filter hidden>
+        <Icon name="material-symbols:search-off-rounded" class="text-[2rem]" />
+        <p>没有符合条件的动态</p>
+        <button type="button" class="wx-filter-empty__clear" data-moments-clear>
+          清空筛选
+        </button>
+      </div>
+
+      <!-- 加载更多指示器 -->
+      <div id="load-more-sentinel" class="load-more-sentinel">
+        <div class="load-more-spinner">
+          <div class="spinner"></div>
+          <span>加载中...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移动端（≤1023px）：左栏三件套收进右下角这 3 个按钮，点谁弹谁 -->
+  <div class="wx-mobile-tools" data-moments-tools>
+    <button
+      type="button"
+      class="wx-mobile-tool"
+      data-moments-tool="search"
+      aria-label="搜索动态"
+      aria-expanded="false"
+    >
+      <Icon name="material-symbols:search-rounded" is:inline />
+    </button>
+    <button
+      type="button"
+      class="wx-mobile-tool"
+      data-moments-tool="calendar"
+      aria-label="按日期筛选"
+      aria-expanded="false"
+    >
+      <Icon name="material-symbols:calendar-month-outline" />
+    </button>
+    <button
+      type="button"
+      class="wx-mobile-tool"
+      data-moments-tool="tags"
+      aria-label="按标签筛选"
+      aria-expanded="false"
+    >
+      <Icon name="material-symbols:tag-outline" />
+    </button>
+  </div>
+
+  <!-- 评论弹窗（单频道聊天室，复用留言板样式，client:load 确保 Swup SPA 首入即水合） -->
+  <MomentCommentChat client:load />
+
+  <!-- 评论按钮委托（Swup 内，SPA 首入即生效） -->
+  <script is:inline>
+  (function() {
+    function bindOnce(){
+      if (window.__momentCommentDelegateBound) return;
+      window.__momentCommentDelegateBound = true;
+      document.addEventListener("click", function(e) {
+        var btn = e.target.closest(".comment-toggle-btn");
+        if (!btn) return;
+        var id = btn.getAttribute("data-moment-id") || "";
+        var published = btn.getAttribute("data-moment-published") || "";
+        var excerpt = btn.getAttribute("data-moment-excerpt") || "";
+        if (!id || !window.__momentComment || !window.__momentComment.open) return;
+        e.preventDefault();
+        window.__momentComment.open(id, published, excerpt);
+      });
+    }
+    bindOnce();
+    // Swup 导航后 Svelte 重挂会更新 window.__momentComment，但委托只需一次；同时监听以防首次从首页进
+    document.addEventListener("swup:content:replaced", bindOnce);
+    document.addEventListener("astro:page-load", bindOnce);
+  })();
+  </script>
+  <script is:inline define:vars={{ walineServerURL }}>
+  (function(){
+    function updateWalineUV(){
+      var countElements = document.querySelectorAll('.waline-count[data-path="/moments/"]');
+      if (!countElements.length) return;
+      if (!walineServerURL) return;
+      fetch(walineServerURL + "/api/uv?path=/moments/")
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          var count = data.data ? data.data.unique_visitor || data.uv || 0 : (data.uv || 0);
+          countElements.forEach(function(el) { el.textContent = String(count); });
+        })
+        .catch(function() {
+          countElements.forEach(function(el) { el.textContent = "-"; });
+        });
+    }
+    updateWalineUV();
+    document.addEventListener("swup:content:replaced", updateWalineUV);
+    document.addEventListener("astro:page-load", updateWalineUV);
+  })();
+  </script>
+
+  <!-- 无限滚动加载（Swup 内，支持 SPA 重入） -->
+  <script is:inline>
+  (function() {
+    var BATCH_SIZE = 5;
+    var currentCount = BATCH_SIZE;
+    var isLoading = false;
+    var allLoaded = false;
+    var observer = null;
+
+    /* 本地说说始终可见：不参与分批揭示，也不占用「前 N 条」名额 */
+    function getItems() {
+      var feed = document.getElementById('moments-feed');
+      return feed ? Array.from(feed.querySelectorAll('.wx-feed-item:not(.wx-local-item)')) : [];
+    }
+
+    function updateVisibility() {
+      var items = getItems();
+      var total = items.length;
+      for (var i = 0; i < total; i++) {
+        if (i < currentCount) {
+          items[i].classList.remove('wx-feed-hidden');
+        } else {
+          items[i].classList.add('wx-feed-hidden');
+        }
+      }
+      return total;
+    }
+
+    function checkAllLoaded() {
+      var sentinel = document.getElementById('load-more-sentinel');
+      if (!sentinel) return;
+      var total = getItems().length;
+      if (currentCount >= total) {
+        allLoaded = true;
+        sentinel.classList.add('hidden');
+      } else {
+        allLoaded = false;
+        sentinel.classList.remove('hidden');
+      }
+    }
+
+    function loadMore() {
+      if (isLoading || allLoaded) return;
+      isLoading = true;
+
+      var items = getItems();
+      var total = items.length;
+
+      setTimeout(function() {
+        var nextBatch = Math.min(currentCount + BATCH_SIZE, total);
+        for (var i = currentCount; i < nextBatch; i++) {
+          if (items[i]) {
+            items[i].classList.remove('wx-feed-hidden');
+          }
+        }
+        currentCount = nextBatch;
+        isLoading = false;
+        checkAllLoaded();
+
+        if (!allLoaded && isSentinelInViewport()) {
+          loadMore();
+        }
+      }, 300);
+    }
+
+    function isSentinelInViewport() {
+      var sentinel = document.getElementById('load-more-sentinel');
+      if (!sentinel) return false;
+      var rect = sentinel.getBoundingClientRect();
+      return rect.top < window.innerHeight + 200;
+    }
+
+    function setupObserver() {
+      var sentinel = document.getElementById('load-more-sentinel');
+      if (!sentinel) return;
+
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+
+      if ('IntersectionObserver' in window) {
+        observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              loadMore();
+            }
+          });
+        }, { root: null, rootMargin: '200px', threshold: 0.1 });
+        observer.observe(sentinel);
+      }
+    }
+
+    function init() {
+      var feed = document.getElementById('moments-feed');
+      var sentinel = document.getElementById('load-more-sentinel');
+      if (!feed || !sentinel) return false;
+
+      currentCount = BATCH_SIZE;
+      isLoading = false;
+      allLoaded = false;
+
+      updateVisibility();
+      checkAllLoaded();
+      setupObserver();
+      return true;
+    }
+
+    function reinit(){ init(); }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { init(); });
+    } else {
+      init();
+    }
+    document.addEventListener("swup:content:replaced", reinit);
+    document.addEventListener("astro:page-load", reinit);
+    /* 本地说说增删后重新分批（本地说说不参与分批，始终显示） */
+    document.addEventListener("moments:local-updated", reinit);
+  })();
+  </script>
+  <!-- 左栏筛选：搜索 / 日历 / 标签（纯前端，筛选激活时接管懒加载） -->
+  <script is:inline define:vars={{ filterMeta }}>
+  (function () {
+    var META = filterMeta;
+    var state = { q: "", tag: "", date: "", month: "" };
+    var calCursor = META.currentMonth;
+    var searchTimer = null;
+
+    function items() {
+      var feed = document.getElementById("moments-feed");
+      return feed ? Array.prototype.slice.call(feed.querySelectorAll(".wx-feed-item")) : [];
+    }
+    function filtering() { return !!(state.q || state.tag || state.date || state.month); }
+
+    function matches(el) {
+      if (state.tag && (el.getAttribute("data-tags") || "").split(",").indexOf(state.tag) < 0) return false;
+      if (state.date && el.getAttribute("data-date") !== state.date) return false;
+      if (state.month && el.getAttribute("data-month") !== state.month) return false;
+      if (state.q && (el.getAttribute("data-search") || "").indexOf(state.q) < 0) return false;
+      return true;
+    }
+
+    /* ---------- 应用 / 清除筛选 ---------- */
+    function apply() {
+      var list = items();
+      var bar = document.querySelector("[data-moments-filter-bar]");
+      var chips = document.querySelector("[data-moments-chips]");
+      var countEl = document.querySelector("[data-moments-count]");
+      var empty = document.querySelector("[data-moments-empty-filter]");
+      var sentinel = document.getElementById("load-more-sentinel");
+      var pinned = document.getElementById("pinned-block");
+
+      if (!filtering()) {
+        /* 交还给懒加载：清掉筛选类，恢复它自己的分批揭示与无限滚动 */
+        list.forEach(function (el) { el.classList.remove("is-filter-match", "is-filter-hide"); });
+        if (bar) bar.hidden = true;
+        if (empty) empty.hidden = true;
+        if (sentinel) sentinel.hidden = false;
+        if (pinned) pinned.style.display = "";
+        return;
+      }
+
+      var shown = 0;
+      list.forEach(function (el) {
+        var ok = matches(el);
+        el.classList.toggle("is-filter-match", ok);
+        el.classList.toggle("is-filter-hide", !ok);
+        if (ok) shown++;
+      });
+
+      if (bar && chips && countEl) {
+        chips.replaceChildren();
+        var parts = [];
+        if (state.q) {
+          parts.push({ label: "搜索：" + state.q, reset: function () {
+            state.q = "";
+            var input = document.querySelector("[data-moments-search]");
+            if (input) input.value = "";
+            syncSearchClear();
+          } });
+        }
+        if (state.tag) parts.push({ label: state.tag, reset: function () { state.tag = ""; syncTagActive(); } });
+        if (state.date) parts.push({ label: state.date, reset: function () { state.date = ""; } });
+        if (state.month) parts.push({ label: state.month, reset: function () { state.month = ""; } });
+        parts.forEach(function (part) {
+          var chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "wx-filter-chip";
+          chip.textContent = part.label + " ×";
+          chip.addEventListener("click", function () { part.reset(); apply(); renderCalendar(); });
+          chips.appendChild(chip);
+        });
+        countEl.textContent = shown + " 条";
+        bar.hidden = false;
+      }
+      if (empty) empty.hidden = shown > 0;
+      /* 筛选期间停用懒加载（否则「加载更多」会按总数继续揭示） */
+      if (sentinel) sentinel.hidden = true;
+      /* 顶部置顶块让位：置顶内容已作为普通项参与筛选 */
+      if (pinned) pinned.style.display = "none";
+    }
+
+    /* ---------- 搜索 ---------- */
+    var searchInput = document.querySelector("[data-moments-search]");
+    var searchClear = document.querySelector("[data-moments-search-clear]");
+    function syncSearchClear() {
+      if (searchClear && searchInput) searchClear.hidden = !searchInput.value;
+    }
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        syncSearchClear();
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          state.q = searchInput.value.trim().toLowerCase();
+          apply();
+        }, 150);
+      });
+    }
+    if (searchClear) {
+      searchClear.addEventListener("click", function () {
+        if (!searchInput) return;
+        searchInput.value = "";
+        state.q = "";
+        syncSearchClear();
+        apply();
+      });
+    }
+
+    /* ---------- 日历 ---------- */
+    var calTitle = document.querySelector("[data-moments-cal-title]");
+    var calGrid = document.querySelector("[data-moments-cal-grid]");
+    function shiftMonth(key, delta) {
+      var y = parseInt(key.slice(0, 4), 10);
+      var m = parseInt(key.slice(5, 7), 10) - 1 + delta;
+      var d = new Date(y, m, 1);
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    }
+    function renderCalendar() {
+      if (!calGrid || !calTitle) return;
+      var y = parseInt(calCursor.slice(0, 4), 10);
+      var m = parseInt(calCursor.slice(5, 7), 10);
+      calTitle.textContent = y + " 年 " + m + " 月";
+      calTitle.classList.toggle("is-active", state.month === calCursor);
+
+      var startDow = new Date(y, m - 1, 1).getDay();
+      var daysInMonth = new Date(y, m, 0).getDate();
+      var today = new Date();
+      var todayKey =
+        today.getFullYear() + "-" +
+        String(today.getMonth() + 1).padStart(2, "0") + "-" +
+        String(today.getDate()).padStart(2, "0");
+
+      calGrid.replaceChildren();
+      for (var i = 0; i < startDow; i++) {
+        var pad = document.createElement("span");
+        pad.className = "wx-cal__cell is-empty";
+        calGrid.appendChild(pad);
+      }
+      for (var day = 1; day <= daysInMonth; day++) {
+        var key = calCursor + "-" + String(day).padStart(2, "0");
+        /* 直接按 DOM 里的 data-date 统计：本地说说也会计入日历 */
+        var cnt = 0;
+        items().forEach(function (el) {
+          if (el.getAttribute("data-date") === key) cnt++;
+        });
+        var cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "wx-cal__cell";
+        cell.textContent = String(day);
+        if (cnt > 0) {
+          cell.classList.add("has-moments");
+          cell.title = key + " · " + cnt + " 条";
+          cell.addEventListener("click", function (k) {
+            return function () {
+              state.date = state.date === k ? "" : k;
+              apply();
+              renderCalendar();
+            };
+          }(key));
+        }
+        if (key === todayKey) cell.classList.add("is-today");
+        if (key === state.date) cell.classList.add("is-active");
+        calGrid.appendChild(cell);
+      }
+    }
+    var calPrev = document.querySelector("[data-moments-cal-prev]");
+    var calNext = document.querySelector("[data-moments-cal-next]");
+    var calToday = document.querySelector("[data-moments-cal-today]");
+    if (calPrev) calPrev.addEventListener("click", function () { calCursor = shiftMonth(calCursor, -1); renderCalendar(); });
+    if (calNext) calNext.addEventListener("click", function () { calCursor = shiftMonth(calCursor, 1); renderCalendar(); });
+    if (calToday) calToday.addEventListener("click", function () { calCursor = META.currentMonth; renderCalendar(); });
+    if (calTitle) {
+      calTitle.addEventListener("click", function () {
+        /* 点月份标题 → 筛整月（再点一次取消） */
+        state.month = state.month === calCursor ? "" : calCursor;
+        state.date = "";
+        apply();
+        renderCalendar();
+      });
+    }
+
+    /* ---------- 标签 ---------- */
+    var tagsWrap = document.querySelector("[data-moments-tags]");
+    function syncTagActive() {
+      if (!tagsWrap) return;
+      Array.prototype.forEach.call(tagsWrap.querySelectorAll("[data-moments-tag]"), function (btn) {
+        btn.classList.toggle("is-active", btn.getAttribute("data-moments-tag") === state.tag);
+      });
+    }
+    if (tagsWrap) {
+      tagsWrap.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-moments-tag]");
+        if (!btn) return;
+        var tag = btn.getAttribute("data-moments-tag");
+        state.tag = state.tag === tag ? "" : tag;
+        syncTagActive();
+        apply();
+      });
+    }
+    /* ---------- 清空 ---------- */
+    function clearAll() {
+      state = { q: "", tag: "", date: "", month: "" };
+      if (searchInput) searchInput.value = "";
+      syncSearchClear();
+      syncTagActive();
+      calCursor = META.currentMonth;
+      renderCalendar();
+      apply();
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-moments-clear]"), function (btn) {
+      btn.addEventListener("click", clearAll);
+    });
+
+    /* ---------- 初始化（Swup 导航后回到默认视图）---------- */
+    function init() {
+      state = { q: "", tag: "", date: "", month: "" };
+      calCursor = META.currentMonth;
+      if (searchInput) searchInput.value = "";
+      syncSearchClear();
+      syncTagActive();
+      renderCalendar();
+      items().forEach(function (el) { el.classList.remove("is-filter-match", "is-filter-hide"); });
+      var bar = document.querySelector("[data-moments-filter-bar]");
+      if (bar) bar.hidden = true;
+      var empty = document.querySelector("[data-moments-empty-filter]");
+      if (empty) empty.hidden = true;
+      var sentinel = document.getElementById("load-more-sentinel");
+      if (sentinel) sentinel.hidden = false;
+      var pinned = document.getElementById("pinned-block");
+      if (pinned) pinned.style.display = "";
+    }
+    init();
+    document.addEventListener("swup:content:replaced", init);
+    document.addEventListener("astro:page-load", init);
+    /* 本地说说增删后：日历按 DOM 重新统计，筛选结果同步刷新 */
+    document.addEventListener("moments:local-updated", function () {
+      renderCalendar();
+      apply();
+    });
+  })();
+  </script>
+
+  <!-- 移动端右下角 3 个按钮：点谁弹谁（面板复用左栏那块 .wx-filter，断点决定它是列还是浮层） -->
+  <script is:inline>
+  (function () {
+    /* 委托到 document，且每次都重新取元素：Swup 换页后按钮/面板是新节点，无需重绑 */
+    if (window.__momentsToolsBound) return;
+    window.__momentsToolsBound = true;
+
+    var view = "";
+
+    function nodes() {
+      return {
+        tools: document.querySelector("[data-moments-tools]"),
+        panel: document.querySelector("[data-moments-filter]"),
+      };
+    }
+
+    function sync() {
+      var n = nodes();
+      if (!n.tools || !n.panel) return;
+
+      Array.prototype.forEach.call(n.tools.querySelectorAll("[data-moments-tool]"), function (btn) {
+        var on = btn.getAttribute("data-moments-tool") === view;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-expanded", on ? "true" : "false");
+      });
+
+      if (view) {
+        n.panel.setAttribute("data-mobile-view", view);
+        n.panel.classList.add("is-mobile-open");
+      } else {
+        n.panel.removeAttribute("data-mobile-view");
+        n.panel.classList.remove("is-mobile-open");
+      }
+    }
+
+    function setView(next) {
+      view = next;
+      sync();
+      if (view !== "search") return;
+      var input = nodes().panel.querySelector("[data-moments-search]");
+      if (input) setTimeout(function () { input.focus(); }, 60);
+    }
+
+    document.addEventListener("click", function (e) {
+      var n = nodes();
+      if (!n.tools || !n.panel) return;
+
+      var btn = e.target.closest("[data-moments-tool]");
+      if (btn) {
+        var next = btn.getAttribute("data-moments-tool") || "";
+        setView(view === next ? "" : next);
+        return;
+      }
+      /* 点面板外部收起；面板内部的点击（选日期/标签）保持打开 */
+      if (view && !n.panel.contains(e.target)) setView("");
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && view) setView("");
+    });
+
+    /* 手机上这 3 个按钮只在浮岛收起（＝FloatingDock 的两个按钮冒出来）时显示，
+       并排在 FloatingDock 那一列的上方；浮岛回来就收起。
+       ⚠️ 浮岛（MobileDock）在布局里排在本页内容之后，脚本执行时它还不存在，
+       所以这里一律「用的时候再取」：滚动事件驱动 + 元素首次出现时挂上观察器 */
+    var observedIsland = null;
+    function syncWithIsland() {
+      var n = nodes();
+      var island = document.getElementById("mobile-dock");
+      if (!n.tools || !n.panel || !island) return;
+      if (island !== observedIsland) {
+        observedIsland = island;
+        new MutationObserver(syncWithIsland).observe(island, { attributes: true, attributeFilter: ["class"] });
+      }
+      var lifted = island.classList.contains("is-hidden");
+      n.tools.classList.toggle("is-island-hidden", lifted);
+      /* 浮岛回来 → 按钮收起，浮层也跟着收 */
+      if (!lifted && view) setView("");
+    }
+    window.addEventListener("scroll", syncWithIsland, { passive: true });
+    document.addEventListener("swup:content:replaced", syncWithIsland);
+    document.addEventListener("astro:page-load", syncWithIsland);
+    syncWithIsland();
+
+    /* Swup 换页后回到默认视图 */
+    document.addEventListener("swup:content:replaced", function () { view = ""; sync(); });
+    document.addEventListener("astro:page-load", function () { view = ""; sync(); });
+  })();
+  </script>
+
+  <!-- 本地说说：发表 / 渲染 / 删除 / 标签合并（写入浏览器 IndexedDB） -->
+  <script>
+  import {
+    buildFrontmatter,
+    downloadPublishBundle,
+    imageExtension,
+    sanitizeFileName,
+    toDateOnly,
+  } from "@/utils/publish-export";
+  import {
+    createLocalId,
+    deleteLocalMoment,
+    listLocalMoments,
+    saveLocalMoment,
+    type LocalMoment,
+  } from "@/utils/social-store";
+
+  /** 当前页面实例的监听解绑控制器 */
+  let abort: AbortController | null = null;
+  /** 卡片图片用到的 Object URL，重新渲染时统一释放 */
+  let objectUrls: string[] = [];
+  /** 表单缩略图预览用到的 Object URL */
+  let previewUrls: string[] = [];
+
+  function releaseObjectUrls() {
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls = [];
+  }
+
+  function releasePreviewUrls() {
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls = [];
+  }
+
+  function pad2(value: number): string {
+    return String(value).padStart(2, "0");
+  }
+
+  /** 本地时间 → YYYY-MM-DD */
+  function toDateKey(ts: number): string {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function formatTimeAgo(ts: number): string {
+    const minutes = Math.floor((Date.now() - ts) / 60000);
+    if (minutes < 1) return "刚刚";
+    if (minutes < 60) return `${minutes}分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}小时前`;
+    return toDateKey(ts);
+  }
+
+  function isImageFile(file: File): boolean {
+    return file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(file.name);
+  }
+
+  function parseTags(raw: string): string[] {
+    return Array.from(
+      new Set(
+        raw
+          .split(/[,，、\s]+/)
+          .map((tag) => tag.replace(/^#+/, "").trim())
+          .filter(Boolean),
+      ),
+    );
+  }
+
+  /** 用纯 DOM 拼卡片，正文一律 textContent，避免注入 */
+  function buildLocalCard(
+    moment: LocalMoment,
+    onDelete: () => void,
+    onExport: () => void,
+  ): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = "wx-feed-item wx-local-item";
+    const date = toDateKey(moment.createdAt);
+    wrapper.setAttribute("data-published", new Date(moment.createdAt).toISOString());
+    wrapper.setAttribute("data-date", date);
+    wrapper.setAttribute("data-month", date.slice(0, 7));
+    wrapper.setAttribute("data-tags", moment.tags.join(","));
+    wrapper.setAttribute("data-search", [moment.body, ...moment.tags].join(" ").toLowerCase());
+
+    const card = document.createElement("div");
+    card.className = "wx-local-card";
+
+    const head = document.createElement("div");
+    head.className = "wx-local-card__head";
+    const avatar = document.createElement("img");
+    avatar.className = "wx-local-card__avatar";
+    avatar.src = "/assets/ziyuan/aurora-avatar.jpg";
+    avatar.alt = "Aurora";
+    avatar.loading = "lazy";
+    avatar.addEventListener("error", () => {
+      avatar.style.display = "none";
+    });
+    const info = document.createElement("div");
+    info.className = "wx-local-card__info";
+    const name = document.createElement("div");
+    name.className = "wx-local-card__name";
+    name.textContent = "Aurora";
+    const time = document.createElement("time");
+    time.className = "wx-local-card__time";
+    time.dateTime = new Date(moment.createdAt).toISOString();
+    time.textContent = formatTimeAgo(moment.createdAt);
+    info.appendChild(name);
+    if (moment.private) {
+      const privateBadge = document.createElement("span");
+      privateBadge.className = "wx-local-card__private-badge";
+      privateBadge.textContent = "私密";
+      info.appendChild(privateBadge);
+    }
+    info.appendChild(time);
+    head.appendChild(avatar);
+    head.appendChild(info);
+    card.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "wx-local-card__body";
+    body.textContent = moment.body;
+    card.appendChild(body);
+
+    if (moment.images.length > 0) {
+      const max = 9;
+      const grid = document.createElement("div");
+      grid.className = "wx-local-card__images";
+      grid.setAttribute("data-cols", String(Math.min(moment.images.length, 3)));
+      moment.images.slice(0, max).forEach((blob, index) => {
+        const url = URL.createObjectURL(blob);
+        objectUrls.push(url);
+        const link = document.createElement("a");
+        link.className = "wx-local-card__image";
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = "说说图片";
+        img.loading = "lazy";
+        link.appendChild(img);
+        if (index === max - 1 && moment.images.length > max) {
+          const more = document.createElement("span");
+          more.className = "wx-local-card__more";
+          more.textContent = `+${moment.images.length - max}`;
+          link.appendChild(more);
+        }
+        grid.appendChild(link);
+      });
+      card.appendChild(grid);
+    }
+
+    const foot = document.createElement("div");
+    foot.className = "wx-local-card__foot";
+    const tags = document.createElement("div");
+    tags.className = "wx-local-card__tags";
+    moment.tags.forEach((tag) => {
+      const chip = document.createElement("span");
+      chip.className = "wx-local-card__tag";
+      chip.textContent = `#${tag}`;
+      tags.appendChild(chip);
+    });
+    const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.className = "wx-local-card__export";
+    exportBtn.textContent = "导出";
+    exportBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onExport();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "wx-local-card__delete";
+    remove.textContent = "删除";
+    remove.addEventListener("click", onDelete);
+    foot.appendChild(tags);
+    foot.appendChild(exportBtn);
+    foot.appendChild(remove);
+    card.appendChild(foot);
+
+    wrapper.appendChild(card);
+    return wrapper;
+  }
+
+  function initMomentsLocal() {
+    abort?.abort();
+    abort = new AbortController();
+    const { signal } = abort;
+
+    /* 换页 / 重入时先释放上一轮 Object URL */
+    releaseObjectUrls();
+    releasePreviewUrls();
+
+    const form = document.getElementById("wx-publish") as HTMLFormElement | null;
+    const feed = document.getElementById("moments-feed");
+    if (!form || !feed) return;
+
+    const textInput = document.getElementById("wx-publish-text") as HTMLTextAreaElement | null;
+    const filesInput = document.getElementById("wx-publish-files") as HTMLInputElement | null;
+    const pickBtn = document.getElementById("wx-publish-pick");
+    const previews = document.getElementById("wx-publish-previews");
+    const tagsInput = document.getElementById("wx-publish-tags") as HTMLInputElement | null;
+    const privateCheckbox = document.getElementById(
+      "wx-publish-private",
+    ) as HTMLInputElement | null;
+    const statusEl = document.getElementById("wx-publish-status");
+    const submitBtn = document.getElementById("wx-publish-submit") as HTMLButtonElement | null;
+    const tagWrap = document.querySelector("[data-moments-tags]");
+    const emptyEl = feed.querySelector(".wx-empty") as HTMLElement | null;
+
+    let pickedFiles: File[] = [];
+    let statusTimer = 0;
+
+    function showStatus(message: string, sticky = false) {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      statusEl.hidden = false;
+      window.clearTimeout(statusTimer);
+      if (!sticky) {
+        statusTimer = window.setTimeout(() => {
+          statusEl.hidden = true;
+        }, 2400);
+      }
+    }
+
+    function renderPreviews() {
+      releasePreviewUrls();
+      if (!previews) return;
+      previews.replaceChildren();
+      if (pickedFiles.length === 0) {
+        previews.hidden = true;
+        return;
+      }
+      previews.hidden = false;
+      pickedFiles.forEach((file, index) => {
+        const url = URL.createObjectURL(file);
+        previewUrls.push(url);
+        const item = document.createElement("div");
+        item.className = "wx-publish__thumb";
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = file.name || "预览";
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "wx-publish__thumb-remove";
+        remove.setAttribute("aria-label", "移除图片");
+        remove.textContent = "×";
+        remove.addEventListener("click", () => {
+          pickedFiles.splice(index, 1);
+          renderPreviews();
+        });
+        item.appendChild(img);
+        item.appendChild(remove);
+        previews.appendChild(item);
+      });
+    }
+
+    function renderLocal(items: LocalMoment[]) {
+      feed!.querySelectorAll(".wx-local-item").forEach((el) => el.remove());
+      releaseObjectUrls();
+      const fragment = document.createDocumentFragment();
+      items.forEach((moment) => {
+        fragment.appendChild(
+          buildLocalCard(
+            moment,
+            () => {
+              void handleDelete(moment.id);
+            },
+            () => {
+              void exportMoment(moment);
+            },
+          ),
+        );
+      });
+      feed!.prepend(fragment);
+      if (emptyEl) emptyEl.hidden = items.length > 0;
+    }
+
+    /** 把本地标签合并进左栏：已有标签加计数，新标签补按钮 */
+    function mergeLocalTags(items: LocalMoment[]) {
+      if (!tagWrap) return;
+      const hits = new Map<string, number>();
+      items.forEach((moment) => {
+        moment.tags.forEach((tag) => {
+          if (!tag) return;
+          hits.set(tag, (hits.get(tag) ?? 0) + 1);
+        });
+      });
+
+      const findButton = (name: string): Element | null =>
+        Array.from(tagWrap.querySelectorAll("[data-moments-tag]")).find(
+          (btn) => btn.getAttribute("data-moments-tag") === name,
+        ) ?? null;
+
+      tagWrap.querySelectorAll<HTMLButtonElement>("[data-moments-tag]").forEach((btn) => {
+        const name = btn.getAttribute("data-moments-tag") ?? "";
+        const countEl = btn.querySelector<HTMLElement>(".wx-tag__count");
+        /* 初始计数只记一次，避免 Swup 重入时累加 */
+        if (!btn.hasAttribute("data-base-count")) {
+          btn.setAttribute("data-base-count", countEl?.textContent?.trim() || "0");
+        }
+        const base = Number.parseInt(btn.getAttribute("data-base-count") || "0", 10) || 0;
+        if (countEl) countEl.textContent = String(base + (hits.get(name) ?? 0));
+      });
+
+      hits.forEach((count, name) => {
+        if (findButton(name)) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "wx-tag";
+        btn.setAttribute("data-moments-tag", name);
+        btn.setAttribute("data-base-count", "0");
+        btn.setAttribute("data-local-tag", "1");
+        const nameEl = document.createElement("span");
+        nameEl.className = "wx-tag__name";
+        nameEl.textContent = name;
+        const countEl = document.createElement("span");
+        countEl.className = "wx-tag__count";
+        countEl.textContent = String(count);
+        btn.appendChild(nameEl);
+        btn.appendChild(countEl);
+        tagWrap.appendChild(btn);
+      });
+
+      /* 本地删光后，移除只为本地标签追加的按钮 */
+      tagWrap.querySelectorAll<HTMLElement>('[data-local-tag="1"]').forEach((btn) => {
+        const name = btn.getAttribute("data-moments-tag") ?? "";
+        if (!hits.has(name)) btn.remove();
+      });
+    }
+
+    async function refresh() {
+      let items: LocalMoment[] = [];
+      try {
+        items = await listLocalMoments();
+      } catch {
+        showStatus("浏览器不支持本地存储（IndexedDB 被禁用？）", true);
+        return;
+      }
+      if (signal.aborted) return;
+      renderLocal(items);
+      mergeLocalTags(items);
+      document.dispatchEvent(new CustomEvent("moments:local-updated"));
+    }
+
+    /** 把单条本地说说导出成可发布的 Markdown + 图片 */
+    async function exportMoment(moment: LocalMoment) {
+      try {
+        const firstLine =
+          moment.body.split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
+        const plainTitle = firstLine
+          .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+          .replace(/\[([^\]]*)\]\([^)]+\)/g, "$1")
+          .replace(/[#>*_`~]/g, "")
+          .trim()
+          .slice(0, 20)
+          .trim();
+        const base = sanitizeFileName(plainTitle || toDateOnly(moment.createdAt));
+
+        const images = moment.images.map((blob, index) => ({
+          name: `${base}-${index + 1}.${imageExtension(blob)}`,
+          blob,
+        }));
+
+        const body = moment.body
+          .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+          .replace(
+            /^\s*<?https?:\/\/\S+\.(?:jpe?g|png|gif|webp|avif|svg|bmp|mp4|webm|mov)(?:\?\S*)?>?\s*$/gim,
+            "",
+          )
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+
+        const frontmatter = buildFrontmatter({
+          published: { raw: toDateOnly(moment.createdAt) },
+          private: moment.private ? { raw: "true" } : undefined,
+          tags: moment.tags,
+          images:
+            images.length > 0
+              ? images.map((image) => `./${image.name}`)
+              : undefined,
+        });
+        const markdown = `${frontmatter}${body}\n`;
+
+        const { markdownName, imageCount } = downloadPublishBundle(
+          markdown,
+          base,
+          images,
+        );
+        showStatus(
+          `已导出 ${markdownName}${imageCount ? ` + ${imageCount} 张图片` : ""}，放进 src/content/动态/ 后重新构建即可公开`,
+        );
+      } catch {
+        showStatus("导出失败，请稍后重试");
+      }
+    }
+
+    async function handleDelete(id: string) {
+      if (!window.confirm("删除这条说说？该操作不可恢复。")) return;
+      try {
+        await deleteLocalMoment(id);
+      } catch {
+        showStatus("删除失败，请稍后重试");
+        return;
+      }
+      if (signal.aborted) return;
+      await refresh();
+    }
+
+    async function publish() {
+      const body = (textInput?.value ?? "").trim();
+      if (!body) {
+        showStatus("这一刻的想法不能为空");
+        textInput?.focus();
+        return;
+      }
+      const tags = parseTags(tagsInput?.value ?? "");
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        await saveLocalMoment({
+          id: createLocalId("moment"),
+          body,
+          tags,
+          images: pickedFiles.slice(),
+          createdAt: Date.now(),
+          private: privateCheckbox?.checked ?? false,
+        });
+      } catch {
+        showStatus("发表失败，可能是浏览器存储空间不足");
+        return;
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+      if (signal.aborted) return;
+      if (textInput) textInput.value = "";
+      if (tagsInput) tagsInput.value = "";
+      if (privateCheckbox) privateCheckbox.checked = false;
+      pickedFiles = [];
+      renderPreviews();
+      showStatus("已发表");
+      await refresh();
+    }
+
+    pickBtn?.addEventListener("click", () => filesInput?.click(), { signal });
+    filesInput?.addEventListener(
+      "change",
+      () => {
+        const files = Array.from(filesInput?.files ?? []).filter(isImageFile);
+        if (filesInput) filesInput.value = "";
+        if (files.length === 0) return;
+        pickedFiles = pickedFiles.concat(files);
+        renderPreviews();
+      },
+      { signal },
+    );
+    form.addEventListener(
+      "submit",
+      (event) => {
+        event.preventDefault();
+        void publish();
+      },
+      { signal },
+    );
+
+    renderPreviews();
+    void refresh();
+  }
+
+  initMomentsLocal();
+  document.addEventListener("astro:page-load", initMomentsLocal);
+  document.addEventListener("swup:content:replaced", initMomentsLocal);
+  window.addEventListener("pagehide", () => {
+    releaseObjectUrls();
+    releasePreviewUrls();
+  });
+  </script>
+
+</MainGridLayout>
+
+
+
+<style>
+  /* 置顶块样式在底部 <style is:global> 中，
+     因为 JS 动态创建的外部置顶元素没有 Astro scoped 属性 */
+
+  /* ============================================
+   * 说说列表
+   * ============================================ */
+  .wx-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem 0 2rem;
+  }
+
+  .wx-feed-item {
+    position: relative;
+  }
+
+  /* 空状态 */
+  .wx-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .wx-empty-icon {
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--btn-regular-bg);
+    border-radius: 50%;
+    color: var(--content-meta);
+    font-size: 2rem;
+  }
+
+  .wx-empty h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 0.375rem;
+  }
+
+  .wx-empty p {
+    font-size: 0.875rem;
+    color: var(--content-meta);
+    margin: 0;
+  }
+
+  /* 访客统计 */
+  .wx-visitor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    margin: 1.5rem auto 0;
+    padding: 0.75rem;
+    color: var(--content-meta);
+    font-size: 0.8125rem;
+  }
+
+  .wx-visitor-icon {
+    font-size: 1rem;
+  }
+
+  /* 隐藏的说说项（分页加载） */
+  .wx-feed-hidden {
+    display: none;
+  }
+
+  /* 加载更多指示器 */
+  .load-more-sentinel {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0;
+    min-height: 60px;
+  }
+
+  .load-more-sentinel.hidden {
+    display: none;
+  }
+
+  .load-more-spinner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--content-meta);
+    font-size: 0.875rem;
+  }
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--line-divider);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* 响应式 */
+  @media (max-width: 480px) {
+    .wx-feed {
+      gap: 1.25rem;
+      padding: 0.75rem 0 1.5rem;
+    }
+
+  }
+</style>
+
+<style is:global>
+  /* ============================================
+   * 发表说说卡片（静态节点，类名统一加 wx-publish 前缀）
+   * ============================================ */
+  .wx-publish {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding: 1rem 1.25rem;
+    background: var(--card-bg);
+    border: 2px solid var(--line-divider);
+    border-radius: 1rem;
+  }
+
+  .wx-publish__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .wx-publish__avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    object-fit: cover;
+    border: 2px solid var(--primary);
+  }
+
+  .wx-publish__name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  .wx-publish__text {
+    min-height: 5rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--line-divider);
+    border-radius: 0.75rem;
+    background: transparent;
+    color: var(--deep-text);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    resize: vertical;
+    outline: none;
+  }
+
+  .wx-publish__text:focus {
+    border-color: var(--deep-text);
+  }
+
+  .wx-publish__text::placeholder {
+    color: var(--content-meta);
+  }
+
+  .wx-publish__previews {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .wx-publish__previews[hidden] {
+    display: none;
+  }
+
+  .wx-publish__thumb {
+    position: relative;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--btn-regular-bg);
+  }
+
+  .wx-publish__thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .wx-publish__thumb-remove {
+    position: absolute;
+    top: 0.125rem;
+    right: 0.125rem;
+    display: grid;
+    place-items: center;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    border: 1px solid var(--line-divider);
+    border-radius: 9999px;
+    background: var(--page-bg);
+    color: var(--deep-text);
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .wx-publish__row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .wx-publish__pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--line-divider);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--content-meta);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: border-color 150ms ease, color 150ms ease;
+  }
+
+  .wx-publish__pick:hover {
+    border-color: var(--deep-text);
+    color: var(--deep-text);
+  }
+
+  .wx-publish__tags {
+    flex: 1;
+    min-width: 8rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--line-divider);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--deep-text);
+    font-family: inherit;
+    font-size: 0.78rem;
+    outline: none;
+  }
+
+  .wx-publish__tags:focus {
+    border-color: var(--deep-text);
+  }
+
+  .wx-publish__tags::placeholder {
+    color: var(--content-meta);
+  }
+
+  .wx-publish__private {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0 0.55rem;
+    border: 1px solid var(--line-divider);
+    border-radius: 0.5rem;
+    color: var(--content-meta);
+    font-size: 0.78rem;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .wx-publish__private input {
+    margin: 0;
+    accent-color: var(--primary);
+  }
+
+  .wx-publish__submit {
+    margin-left: auto;
+    padding: 0.35rem 1.1rem;
+    border: 2px solid var(--deep-text);
+    border-radius: 9999px;
+    background: var(--deep-text);
+    color: var(--page-bg);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 150ms ease;
+  }
+
+  .wx-publish__submit:hover {
+    opacity: 0.85;
+  }
+
+  .wx-publish__submit:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .wx-publish__status {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--content-meta);
+  }
+
+  .wx-publish__status[hidden] {
+    display: none;
+  }
+
+  /* ============================================
+   * 本地说说卡片（脚本动态创建，无 scoped 属性）
+   * ============================================ */
+  .wx-local-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    background: var(--card-bg);
+    border: 2px solid var(--line-divider);
+    border-radius: 1rem;
+    color: var(--deep-text);
+  }
+
+  .wx-local-card__head {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .wx-local-card__avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    object-fit: cover;
+    border: 2px solid var(--primary);
+    flex-shrink: 0;
+  }
+
+  .wx-local-card__info {
+    min-width: 0;
+  }
+
+  .wx-local-card__name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  .wx-local-card__time {
+    font-size: 0.75rem;
+    color: var(--content-meta);
+  }
+
+  .wx-local-card__private-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.4rem;
+    padding: 0 0.4rem;
+    height: 1rem;
+    border-radius: 0.3rem;
+    background: color-mix(in oklch, var(--primary) 14%, transparent);
+    color: var(--primary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .wx-local-card__body {
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .wx-local-card__images {
+    display: grid;
+    gap: 0.375rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .wx-local-card__images[data-cols="1"] {
+    grid-template-columns: minmax(0, 12rem);
+  }
+
+  .wx-local-card__images[data-cols="2"] {
+    grid-template-columns: repeat(2, minmax(0, 10rem));
+  }
+
+  .wx-local-card__image {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background: var(--btn-regular-bg);
+  }
+
+  .wx-local-card__image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .wx-local-card__more {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .wx-local-card__foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .wx-local-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-right: auto;
+  }
+
+  .wx-local-card__tag {
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--primary);
+    border-radius: 9999px;
+    color: var(--primary);
+    font-size: 0.75rem;
+  }
+
+  .wx-local-card__export,
+  .wx-local-card__delete {
+    padding: 0.25rem 0.7rem;
+    border: 1px solid var(--line-divider);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--content-meta);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: border-color 150ms ease, color 150ms ease;
+  }
+
+  .wx-local-card__export:hover,
+  .wx-local-card__delete:hover {
+    border-color: var(--deep-text);
+    color: var(--deep-text);
+  }
+
+  @media (max-width: 480px) {
+    .wx-publish {
+      padding: 0.875rem;
+    }
+
+    .wx-local-card {
+      padding: 0.875rem;
+    }
+  }
+</style>
+

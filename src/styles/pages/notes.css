@@ -1,0 +1,830 @@
+/* ==========================================================================
+   /notes/ 本地笔记页
+   - 左栏列表 + 右栏阅读器，与站内「2px 描边 + 反色 hover」的极简语言保持一致
+   - 代码块行号：左侧固定行号栏，行高与代码一致（不随横向滚动移动）
+   ========================================================================== */
+
+.notes-page {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+/* ── 左栏 ── */
+.notes-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 2px solid var(--deep-text);
+  border-radius: var(--radius-large);
+  background: var(--page-bg);
+  position: sticky;
+  top: 6rem;
+  max-height: calc(100vh - 8rem);
+}
+
+.notes-page [hidden] {
+  display: none !important;
+}
+
+.notes-library,
+.notes-reader-side {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.notes-back {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  border: 1.5px solid var(--line-divider);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--content-meta);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.notes-back:hover {
+  border-color: var(--deep-text);
+  color: var(--deep-text);
+}
+
+.notes-toc {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notes-toc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notes-toc__sublist {
+  margin: 0.15rem 0 0 1rem;
+  padding-left: 0.65rem;
+  border-left: 1px dashed var(--line-divider);
+}
+
+.notes-toc__item {
+  min-width: 0;
+}
+
+.notes-toc__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.notes-toc__toggle,
+.notes-toc__spacer {
+  flex: 0 0 1rem;
+  width: 1rem;
+  min-width: 1rem;
+  height: 1.55rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--content-meta);
+  line-height: 1.55rem;
+}
+
+.notes-toc__toggle {
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.notes-toc__toggle:hover {
+  color: var(--deep-text);
+}
+
+.notes-toc__toggle[aria-expanded="false"] {
+  transform: translateX(-1px);
+}
+
+.notes-toc__link {
+  flex: 1 1 auto;
+  display: block;
+  min-width: 0;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.4rem;
+  color: var(--content-meta);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.notes-toc__item[data-depth="3"] .notes-toc__link,
+.notes-toc__item[data-depth="4"] .notes-toc__link {
+  font-size: 0.75rem;
+}
+
+.notes-toc__link:hover,
+.notes-toc__link:focus-visible {
+  background: color-mix(in oklch, var(--deep-text) 8%, transparent);
+  color: var(--deep-text);
+  outline: none;
+}
+
+.notes-toc__empty {
+  margin: 0;
+  color: var(--content-meta);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.notes-content h1,
+.notes-content h2,
+.notes-content h3,
+.notes-content h4 {
+  scroll-margin-top: 6rem;
+}
+
+.notes-public__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.notes-public__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.notes-public__item {
+  display: flex;
+  height: 100%;
+  min-height: 10rem;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.1rem;
+  border: 1.5px solid var(--line-divider);
+  border-radius: var(--radius-large);
+  color: var(--deep-text);
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.notes-public__item:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.notes-public__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.notes-public__meta,
+.notes-public__description {
+  color: var(--content-meta);
+  font-size: 0.75rem;
+  line-height: 1.65;
+}
+
+.notes-public__description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.notes-public__open {
+  margin-top: auto;
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.notes-public__empty {
+  margin: 2rem 0;
+  color: var(--content-meta);
+  text-align: center;
+}
+
+.notes-side__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.notes-side__label {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--content-meta);
+}
+
+.notes-count {
+  min-width: 1.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 9999px;
+  background: var(--deep-text);
+  color: var(--page-bg);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.notes-upload-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--content-meta);
+  font-size: 0.75rem;
+}
+
+.notes-upload-tag select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1.5px solid var(--line-divider);
+  border-radius: 0.6rem;
+  outline: none;
+  background: var(--page-bg);
+  color: var(--deep-text);
+  font-size: 0.8125rem;
+}
+
+.notes-upload-tag select:focus {
+  border-color: var(--deep-text);
+}
+
+.notes-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.45rem 0.8rem;
+  border: 2px solid var(--deep-text);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--deep-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.notes-btn:hover {
+  background: var(--deep-text);
+  color: var(--page-bg);
+}
+
+.notes-btn--primary {
+  flex: 1 1 auto;
+  background: var(--deep-text);
+  color: var(--page-bg);
+}
+
+.notes-btn--primary:hover {
+  background: transparent;
+  color: var(--deep-text);
+}
+
+.notes-btn--danger {
+  border-color: #d1495b;
+  color: #d1495b;
+}
+
+.notes-btn--danger:hover {
+  background: #d1495b;
+  border-color: #d1495b;
+  color: #fff;
+}
+
+.notes-btn svg {
+  font-size: 1.125rem;
+}
+
+.notes-search {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.6rem;
+  border: 1.5px solid var(--line-divider);
+  border-radius: 0.65rem;
+  color: var(--content-meta);
+}
+
+.notes-search:focus-within {
+  border-color: var(--deep-text);
+}
+
+.notes-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--deep-text);
+  font-size: 0.8125rem;
+}
+
+.notes-search input::placeholder {
+  color: var(--content-meta);
+}
+
+.notes-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.notes-item__btn {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.notes-item__btn:hover {
+  background: color-mix(in oklch, var(--deep-text) 8%, transparent);
+}
+
+.notes-item.is-active .notes-item__btn {
+  border-left-color: var(--deep-text);
+  background: color-mix(in oklch, var(--deep-text) 10%, transparent);
+}
+
+.notes-item__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--deep-text);
+}
+
+.notes-item__meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.6875rem;
+  color: var(--content-meta);
+}
+
+.notes-side__empty,
+.notes-side__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--content-meta);
+}
+
+.notes-side__empty {
+  padding: 0.5rem 0.25rem;
+}
+
+.notes-side__hint {
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--line-divider);
+}
+
+/* ── 右栏阅读器 ── */
+.notes-main {
+  min-height: 32rem;
+  padding: 1.25rem 1.5rem 2.25rem;
+  border: 2px solid var(--deep-text);
+  border-radius: var(--radius-large);
+  background: var(--page-bg);
+}
+
+.notes-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 24rem;
+  color: var(--content-meta);
+  font-size: 0.875rem;
+}
+
+.notes-placeholder svg {
+  font-size: 2.5rem;
+  opacity: 0.6;
+}
+
+.notes-doc__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid var(--deep-text);
+}
+
+.notes-doc__title {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--deep-text);
+}
+
+.notes-doc__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  flex: 1 1 auto;
+  font-size: 0.75rem;
+  color: var(--content-meta);
+}
+
+.notes-doc__tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.notes-tag {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line-divider);
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+}
+
+.notes-doc__tools {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.notes-loading {
+  color: var(--content-meta);
+  font-size: 0.875rem;
+}
+
+/* ── 代码块（macOS 窗口栏 + 行号） ── */
+.notes-content {
+  --note-code-line: 1.65rem;
+  /* 笔记正文显式继承站点主题色：文章页靠 .prose 提供基础色，
+     笔记容器没有该 class，暗色下会退回浏览器默认黑色而看不见 */
+  color: var(--deep-text);
+}
+
+.notes-content .note-code {
+  margin: 1.25rem 0;
+  border: 1px solid var(--line-divider);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #f6f8fa;
+}
+
+.notes-content .note-code__head {
+  display: flex;
+  align-items: center;
+  height: 2.25rem;
+  padding: 0 1rem;
+}
+
+.notes-content .note-code__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.notes-content .note-code__dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 9999px;
+}
+
+.notes-content .note-code__dot--red {
+  background: #ff5f57;
+}
+
+.notes-content .note-code__dot--yellow {
+  background: #febc2e;
+}
+
+.notes-content .note-code__dot--green {
+  background: #28c840;
+}
+
+.notes-content .note-code__body {
+  display: flex;
+  align-items: flex-start;
+  padding-bottom: 0.9rem;
+}
+
+.notes-content .note-code__gutter {
+  flex: 0 0 auto;
+  padding: 0 0.6rem 0 1rem;
+  color: #8c959f;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8rem;
+  line-height: var(--note-code-line);
+  text-align: right;
+  user-select: none;
+}
+
+.notes-content .note-code__gutter span {
+  display: block;
+}
+
+.notes-content .note-code pre.note-pre {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0 1rem 0 0.35rem;
+  background: transparent;
+  overflow-x: auto;
+}
+
+.notes-content .note-code pre.note-pre code.hljs {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: #24292f;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8rem;
+  line-height: var(--note-code-line);
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* 暗色主题下的代码块 */
+html.dark .notes-content .note-code {
+  border-color: #30363d;
+  background: #161b22;
+}
+
+html.dark .notes-content .note-code__gutter {
+  color: #6e7681;
+}
+
+html.dark .notes-content .note-code pre.note-pre code.hljs {
+  color: #c9d1d9;
+}
+
+/* 普通行内代码跟随主题 */
+.notes-content :not(pre) > code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  background: color-mix(in oklch, var(--deep-text) 10%, transparent);
+  font-size: 0.85em;
+}
+
+/* ── 编辑器 ── */
+.notes-editor__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--deep-text);
+}
+
+.notes-editor__title {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.35rem 0.1rem;
+  border: none;
+  border-bottom: 1.5px dashed transparent;
+  outline: none;
+  background: transparent;
+  color: var(--deep-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.notes-editor__title:focus {
+  border-bottom-color: var(--line-divider);
+}
+
+.notes-editor__title::placeholder {
+  color: var(--content-meta);
+  font-weight: 600;
+}
+
+.notes-editor__tools {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* 标签行：可直接从已有分类/标签里选，也可手填 */
+.notes-editor__meta {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.notes-editor__tags {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.4rem 0.65rem;
+  border: 1.5px solid var(--line-divider);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--deep-text);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.notes-editor__tags:focus {
+  border-color: var(--deep-text);
+}
+
+.notes-editor__tags::placeholder {
+  color: var(--content-meta);
+}
+
+.notes-editor__cover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.notes-editor__cover-preview {
+  width: 5rem;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line-divider);
+  border-radius: 0.45rem;
+  object-fit: cover;
+}
+
+.notes-editor__cover-name {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--content-meta);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-editor__cover .notes-btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.notes-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.notes-editor__body {
+  display: block;
+  width: 100%;
+  min-height: 30rem;
+  padding: 0.9rem 1rem;
+  border: 1.5px solid var(--line-divider);
+  border-radius: 0.75rem;
+  outline: none;
+  background: color-mix(in oklch, var(--deep-text) 3%, transparent);
+  color: var(--deep-text);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85rem;
+  line-height: 1.8;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.notes-editor__body:focus {
+  border-color: var(--deep-text);
+}
+
+.notes-editor__body::placeholder {
+  color: var(--content-meta);
+}
+
+.notes-editor__hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.75rem;
+  color: var(--content-meta);
+}
+
+@media (max-width: 768px) {
+  .notes-editor__title {
+    font-size: 1.25rem;
+  }
+
+  .notes-editor__body {
+    min-height: 20rem;
+  }
+}
+
+/* ── 拖拽提示与 toast ── */
+.notes-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 2px dashed var(--deep-text);
+  border-radius: var(--radius-large);
+  background: color-mix(in oklch, var(--page-bg) 88%, transparent);
+  color: var(--deep-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.notes-drop.is-visible {
+  opacity: 1;
+}
+
+.notes-drop svg {
+  font-size: 2.25rem;
+}
+
+.notes-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 6rem;
+  z-index: 80;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  background: var(--deep-text);
+  color: var(--page-bg);
+  font-size: 0.8125rem;
+  transform: translate(-50%, 0.5rem);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.notes-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ── 移动端：列表在上，阅读器在下 ── */
+@media (max-width: 768px) {
+  .notes-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .notes-side {
+    position: static;
+    max-height: none;
+  }
+
+  .notes-list {
+    max-height: 18rem;
+  }
+
+  .notes-main {
+    padding: 1rem 1rem 1.75rem;
+  }
+
+  .notes-doc__title {
+    font-size: 1.25rem;
+  }
+}

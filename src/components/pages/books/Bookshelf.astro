@@ -1,0 +1,1357 @@
+---
+import ClientPagination from "@/components/common/ClientPagination.astro";
+import BookCard from "./BookCard.astro";
+
+interface BookData {
+	title: string;
+	coverImage: string;
+	link: string;
+	status: number;
+	score: number;
+	category: string;
+}
+
+interface FilterItem {
+	value: string;
+	label: string;
+	count: number;
+}
+
+interface Props {
+	books: BookData[];
+	tabs: FilterItem[];
+	statusFilters: FilterItem[];
+	/** 手动书籍没有封面时使用的默认封面 */
+	defaultCover?: string;
+}
+
+const {
+	books,
+	tabs,
+	statusFilters,
+	defaultCover = "/assets/images/covers/1.webp",
+} = Astro.props;
+
+const SECTION_ID = "books";
+const statusMap: Record<number, string> = {
+	1: "wish",
+	2: "collect",
+	3: "doing",
+	4: "on_hold",
+	5: "dropped",
+};
+---
+
+<div class="bookshelf" data-bookshelf data-books-default-cover={defaultCover}>
+	<!-- 分类筛选（影视页同款胶囊） -->
+	<div class="books-filter-pill" data-books-tab-nav>
+		<div class="tools-tab-indicator" data-books-tab-indicator></div>
+		{tabs.map((tab, i) => (
+			<button
+				type="button"
+				class:list={[
+					"tools-tab-btn",
+					i === 0 ? "tools-tab-btn-active" : "tools-tab-btn-inactive",
+				]}
+				data-books-tab={tab.value}
+			>
+				<span>{tab.label}</span>
+				<span class="tools-tab-badge">{tab.count}</span>
+			</button>
+		))}
+	</div>
+
+	<!-- 状态筛选（读过/在读/想读…） -->
+	<div class="books-filter-pill books-status-pill" data-books-status-nav>
+		<div class="tools-tab-indicator" data-books-status-indicator></div>
+		{statusFilters.map((filter, i) => (
+			<button
+				type="button"
+				class:list={[
+					"tools-tab-btn",
+					i === 0 ? "tools-tab-btn-active" : "tools-tab-btn-inactive",
+				]}
+				data-books-status={filter.value}
+			>
+				<span>{filter.label}</span>
+				<span class="tools-tab-badge">{filter.count}</span>
+			</button>
+		))}
+	</div>
+
+	<div class="shelf-grid" data-books-grid>
+		{books.map((book) => (
+			<div
+				class="shelf-item"
+				data-item-section={SECTION_ID}
+				data-books-item-cat={book.category}
+				data-books-item-status={statusMap[book.status] || "unknown"}
+			>
+				<BookCard
+					title={book.title}
+					coverImage={book.coverImage}
+					link={book.link}
+					status={book.status}
+					score={book.score}
+				/>
+			</div>
+		))}
+	</div>
+
+	<p class="books-empty" data-books-empty hidden>
+		{import.meta.env.DEV
+			? "书架上还没有书籍。点右上角「添加书籍」开始记录吧。"
+			: "书架上还没有书籍。"}
+	</p>
+
+	<ClientPagination
+		totalItems={Math.max(books.length, 1)}
+		itemsPerPage={10}
+		itemsPerPageMobile={6}
+		currentPage={1}
+		sectionId={SECTION_ID}
+	/>
+
+	{import.meta.env.DEV && (
+		<>
+			<!-- 手动书籍卡片模板：克隆后才能保留 BookCard 与 Bookshelf 的 scoped 样式 -->
+			<template data-books-card-template>
+				<div
+					class="shelf-item shelf-item--manual"
+					data-item-section={SECTION_ID}
+					data-books-item-cat="未分类"
+					data-books-item-status="wish"
+				>
+					<BookCard
+						title="占位书名"
+						coverImage={defaultCover}
+						link="#"
+						status={1}
+						score={1}
+					/>
+					<button
+						type="button"
+						class="manual-book-delete"
+						data-manual-book-delete
+						aria-label="删除这本书"
+						title="删除这本书"
+					>×</button>
+				</div>
+			</template>
+
+			<!-- 新分类按钮模板：同样克隆以继承 scoped 胶囊样式 -->
+			<template data-books-category-template>
+				<button
+					type="button"
+					class="tools-tab-btn tools-tab-btn-inactive"
+					data-books-tab="未分类"
+				>
+					<span data-manual-tab-label>未分类</span>
+					<span class="tools-tab-badge">0</span>
+				</button>
+			</template>
+
+			<!-- 添加书籍弹层 -->
+			<div class="books-modal" data-books-modal hidden>
+				<div class="books-modal__backdrop" data-books-modal-close></div>
+				<form class="books-modal__panel" data-books-form novalidate>
+					<div class="books-modal__head">
+						<h2>添加书籍</h2>
+						<button
+							type="button"
+							class="books-modal__close"
+							data-books-modal-close
+							aria-label="关闭"
+						>×</button>
+					</div>
+
+					<label class="books-field">
+						<span class="books-field__label">书名 <em>*</em></span>
+						<input
+							type="text"
+							maxlength="160"
+							autocomplete="off"
+							data-books-form-title
+							placeholder="输入书名"
+						/>
+					</label>
+
+					<div class="books-field">
+						<span class="books-field__label">封面</span>
+						<div class="books-cover">
+							<input type="file" accept="image/*" hidden data-books-form-cover />
+							<button type="button" class="books-mini-btn" data-books-cover-btn>
+								选择图片
+							</button>
+							<img
+								class="books-cover__preview"
+								alt="封面预览"
+								data-books-cover-preview
+								hidden
+							/>
+							<button
+								type="button"
+								class="books-mini-btn books-mini-btn--danger"
+								data-books-cover-clear
+								hidden
+							>移除封面</button>
+							<span class="books-cover__name" data-books-cover-name>
+								可选，未选择时使用默认封面
+							</span>
+						</div>
+					</div>
+
+					<label class="books-field">
+						<span class="books-field__label">链接</span>
+						<input
+							type="url"
+							autocomplete="off"
+							data-books-form-link
+							placeholder="可选，例如 https://…"
+						/>
+					</label>
+
+					<div class="books-field-row">
+						<label class="books-field">
+							<span class="books-field__label">阅读状态</span>
+							<select data-books-form-status>
+								<option value="1">想读</option>
+								<option value="2">读过</option>
+								<option value="3">在读</option>
+								<option value="4">搁置</option>
+								<option value="5">抛弃</option>
+							</select>
+						</label>
+
+						<label class="books-field">
+							<span class="books-field__label">评分（0-10）</span>
+							<input
+								type="number"
+								min="0"
+								max="10"
+								step="0.1"
+								inputmode="decimal"
+								data-books-form-score
+								placeholder="0"
+							/>
+						</label>
+					</div>
+
+					<label class="books-field">
+						<span class="books-field__label">分类</span>
+						<input
+							type="text"
+							maxlength="40"
+							autocomplete="off"
+							data-books-form-category
+							placeholder="可选，默认「未分类」"
+						/>
+					</label>
+
+					<p class="books-form-error" data-books-form-error hidden></p>
+
+					<div class="books-modal__actions">
+						<button type="button" class="books-mini-btn" data-books-modal-close>
+							取消
+						</button>
+						<button type="submit" class="books-mini-btn books-mini-btn--primary">
+							保存
+						</button>
+					</div>
+				</form>
+			</div>
+		</>
+	)}
+
+	<div class="books-toast" data-books-toast role="status" aria-live="polite"></div>
+</div>
+
+<script>
+	import {
+		createRecordId,
+		deleteManualBook,
+		listManualBooks,
+		saveManualBook,
+	} from "@/utils/records-store";
+	import type { ManualBook } from "@/utils/records-store";
+
+	const STATUS_META: Record<number, { label: string; color: string; value: string }> = {
+		1: { label: "想读", color: "#5bc0de", value: "wish" },
+		2: { label: "读过", color: "#5cb85c", value: "collect" },
+		3: { label: "在读", color: "#f0ad4e", value: "doing" },
+		4: { label: "搁置", color: "#9b8ec4", value: "on_hold" },
+		5: { label: "抛弃", color: "#d9534f", value: "dropped" },
+	};
+
+	let dispose: (() => void) | null = null;
+	let initToken = 0;
+
+	function formatScore(score: number): string {
+		return `${score}`.replace(/\.0$/, "");
+	}
+
+	/** 只允许 http(s)、站内绝对路径与相对路径，避免把 javascript: 之类的链接写进 href */
+	function normalizeLink(raw: string): string {
+		const value = raw.trim();
+		if (!value || value === "#") return "#";
+		if (/^(https?:\/\/|\/|\.\/|\.\.\/)/i.test(value)) return value;
+		return "#";
+	}
+
+	function initBookshelf() {
+		const root = document.querySelector<HTMLElement>("[data-bookshelf]");
+		if (!root) {
+			dispose?.();
+			dispose = null;
+			return;
+		}
+
+		dispose?.();
+		const token = ++initToken;
+		const abort = new AbortController();
+		const { signal } = abort;
+
+		const defaultCover =
+			root.dataset.booksDefaultCover || "/assets/images/covers/1.webp";
+		const tabNav = root.querySelector<HTMLElement>("[data-books-tab-nav]");
+		const statusNav = root.querySelector<HTMLElement>("[data-books-status-nav]");
+		const grid = root.querySelector<HTMLElement>("[data-books-grid]");
+		const emptyHint = root.querySelector<HTMLElement>("[data-books-empty]");
+		const toastEl = root.querySelector<HTMLElement>("[data-books-toast]");
+		const modal = root.querySelector<HTMLElement>("[data-books-modal]");
+		const form = root.querySelector<HTMLFormElement>("[data-books-form]");
+		const addBtn = document.getElementById("books-add-btn");
+
+		const titleInput = root.querySelector<HTMLInputElement>("[data-books-form-title]");
+		const coverInput = root.querySelector<HTMLInputElement>("[data-books-form-cover]");
+		const coverBtn = root.querySelector<HTMLButtonElement>("[data-books-cover-btn]");
+		const coverClear = root.querySelector<HTMLButtonElement>("[data-books-cover-clear]");
+		const coverPreview = root.querySelector<HTMLImageElement>("[data-books-cover-preview]");
+		const coverName = root.querySelector<HTMLElement>("[data-books-cover-name]");
+		const linkInput = root.querySelector<HTMLInputElement>("[data-books-form-link]");
+		const statusSelect = root.querySelector<HTMLSelectElement>("[data-books-form-status]");
+		const scoreInput = root.querySelector<HTMLInputElement>("[data-books-form-score]");
+		const categoryInput = root.querySelector<HTMLInputElement>("[data-books-form-category]");
+		const errorEl = root.querySelector<HTMLElement>("[data-books-form-error]");
+
+		if (
+			!tabNav ||
+			!statusNav ||
+			!grid ||
+			!modal ||
+			!form ||
+			!titleInput ||
+			!coverInput ||
+			!coverBtn ||
+			!coverClear ||
+			!coverPreview ||
+			!coverName ||
+			!linkInput ||
+			!statusSelect ||
+			!scoreInput ||
+			!categoryInput
+		) {
+			dispose = () => abort.abort();
+			return;
+		}
+
+		let books: ManualBook[] = [];
+		let coverFile: File | null = null;
+		let coverUrl = "";
+		let toastTimer = 0;
+		const cardUrls: string[] = [];
+
+		function releaseCardUrls() {
+			cardUrls.forEach((url) => URL.revokeObjectURL(url));
+			cardUrls.length = 0;
+		}
+
+		dispose = () => {
+			abort.abort();
+			releaseCardUrls();
+			if (coverUrl) {
+				URL.revokeObjectURL(coverUrl);
+				coverUrl = "";
+			}
+			window.clearTimeout(toastTimer);
+		};
+
+		function toast(message: string) {
+			if (!toastEl) return;
+			toastEl.textContent = message;
+			toastEl.classList.add("is-visible");
+			window.clearTimeout(toastTimer);
+			toastTimer = window.setTimeout(() => {
+				toastEl.classList.remove("is-visible");
+			}, 2200);
+		}
+
+		function showError(message: string) {
+			if (!errorEl) return;
+			errorEl.textContent = message;
+			errorEl.hidden = false;
+		}
+
+		function clearError() {
+			if (errorEl) errorEl.hidden = true;
+		}
+
+		function setCover(file: File | null) {
+			coverFile = file;
+			if (coverUrl) {
+				URL.revokeObjectURL(coverUrl);
+				coverUrl = "";
+			}
+			if (file) {
+				coverUrl = URL.createObjectURL(file);
+				coverPreview.src = coverUrl;
+				coverPreview.hidden = false;
+				coverName.textContent = file.name;
+				coverClear.hidden = false;
+			} else {
+				coverPreview.hidden = true;
+				coverPreview.removeAttribute("src");
+				coverName.textContent = "可选，未选择时使用默认封面";
+				coverClear.hidden = true;
+			}
+		}
+
+		function openModal() {
+			clearError();
+			form.reset();
+			setCover(null);
+			modal.hidden = false;
+			titleInput.focus();
+		}
+
+		function closeModal() {
+			modal.hidden = true;
+			setCover(null);
+			clearError();
+		}
+
+		function updateIndicator(indicator: HTMLElement | null, btn: HTMLElement | null) {
+			if (!indicator || !btn) return;
+			indicator.style.left = `${btn.offsetLeft}px`;
+			indicator.style.top = `${btn.offsetTop}px`;
+			indicator.style.width = `${btn.offsetWidth}px`;
+			indicator.style.height = `${btn.offsetHeight}px`;
+			indicator.style.opacity = "1";
+		}
+
+		function activateBtn(btns: HTMLElement[], target: HTMLElement, indicator: HTMLElement | null) {
+			btns.forEach((btn) => {
+				btn.classList.remove("tools-tab-btn-active");
+				btn.classList.add("tools-tab-btn-inactive");
+			});
+			target.classList.remove("tools-tab-btn-inactive");
+			target.classList.add("tools-tab-btn-active");
+			requestAnimationFrame(() => updateIndicator(indicator, target));
+		}
+
+		function initIndicators() {
+			const catIndicator = tabNav.querySelector<HTMLElement>("[data-books-tab-indicator]");
+			const catActive = tabNav.querySelector<HTMLElement>(".tools-tab-btn-active");
+			if (catIndicator && catActive) updateIndicator(catIndicator, catActive);
+
+			const statusIndicator = statusNav.querySelector<HTMLElement>(
+				"[data-books-status-indicator]",
+			);
+			const statusActive = statusNav.querySelector<HTMLElement>(".tools-tab-btn-active");
+			if (statusIndicator && statusActive) updateIndicator(statusIndicator, statusActive);
+		}
+
+		function getStaticCards(): HTMLElement[] {
+			return Array.from(
+				root.querySelectorAll<HTMLElement>(
+					"[data-item-section='books']:not([data-manual-book-id])",
+				),
+			);
+		}
+
+		function syncPaginationVisibility() {
+			const pagination = root.querySelector<HTMLElement>(
+				"[data-pagination-section='books']",
+			);
+			if (!pagination) return;
+			const total = root.querySelectorAll("[data-item-section='books']").length;
+			pagination.style.display = total > 0 ? "" : "none";
+		}
+
+		function applyFilter() {
+			const cat =
+				tabNav.querySelector<HTMLElement>(".tools-tab-btn-active")?.dataset
+					.booksTab || "all";
+			const status =
+				statusNav.querySelector<HTMLElement>(".tools-tab-btn-active")?.dataset
+					.booksStatus || "all";
+
+			let visibleCount = 0;
+			root
+				.querySelectorAll<HTMLElement>("[data-item-section='books']")
+				.forEach((el) => {
+					const matchCat = cat === "all" || el.dataset.booksItemCat === cat;
+					const matchStatus =
+						status === "all" || el.dataset.booksItemStatus === status;
+					const match = matchCat && matchStatus;
+					el.classList.toggle("hidden", !match);
+					el.style.display = match ? "" : "none";
+					if (match) visibleCount += 1;
+				});
+
+			const pagination = root.querySelector<HTMLElement>(
+				"[data-pagination-section='books']",
+			);
+			if (pagination) {
+				pagination.dispatchEvent(
+					new CustomEvent("updatePagination", {
+						detail: { visibleCount },
+					}),
+				);
+			}
+			syncPaginationVisibility();
+		}
+
+		function createCard(book: ManualBook): HTMLElement | null {
+			const template = root.querySelector<HTMLTemplateElement>(
+				"[data-books-card-template]",
+			);
+			const card = template?.content.firstElementChild?.cloneNode(true) as
+				| HTMLElement
+				| undefined;
+			if (!card) return null;
+
+			const meta = STATUS_META[book.status] ?? {
+				label: "",
+				color: "#999",
+				value: "unknown",
+			};
+
+			card.dataset.manualBookId = book.id;
+			card.dataset.booksItemCat = book.category;
+			card.dataset.booksItemStatus = meta.value;
+
+			const anchor = card.querySelector<HTMLAnchorElement>("a.nb-book");
+			if (anchor) {
+				anchor.title = book.title;
+				if (book.link && book.link !== "#") {
+					anchor.href = book.link;
+				} else {
+					anchor.href = "#";
+					anchor.dataset.manualNoLink = "1";
+				}
+			}
+
+			const img = card.querySelector<HTMLImageElement>(
+				".nb-book-illustration-img",
+			);
+			if (img) {
+				img.alt = book.title;
+				if (book.cover) {
+					const url = URL.createObjectURL(book.cover);
+					cardUrls.push(url);
+					img.src = url;
+				} else {
+					img.src = defaultCover;
+				}
+			}
+
+			const statusTag = card.querySelector<HTMLElement>(".book-status-tag");
+			if (statusTag) {
+				statusTag.textContent = meta.label;
+				statusTag.style.background = meta.color;
+			}
+
+			const scoreTag = card.querySelector<HTMLElement>(".book-score-tag");
+			if (scoreTag) {
+				if (book.score > 0) {
+					const star = scoreTag.querySelector("svg");
+					scoreTag.replaceChildren();
+					if (star) scoreTag.appendChild(star);
+					scoreTag.appendChild(
+						document.createTextNode(formatScore(book.score)),
+					);
+				} else {
+					scoreTag.remove();
+				}
+			}
+
+			return card;
+		}
+
+		function renderCards() {
+			releaseCardUrls();
+			root
+				.querySelectorAll<HTMLElement>("[data-manual-book-id]")
+				.forEach((el) => el.remove());
+
+			const fragment = document.createDocumentFragment();
+			for (const book of books) {
+				const card = createCard(book);
+				if (card) fragment.appendChild(card);
+			}
+			grid.insertBefore(fragment, grid.firstElementChild);
+		}
+
+		function rebuildCategoryTabs() {
+			const active = tabNav.querySelector<HTMLElement>(".tools-tab-btn-active");
+			const activeCat = active?.dataset.booksTab || "all";
+
+			tabNav
+				.querySelectorAll<HTMLElement>("[data-manual-tab]")
+				.forEach((el) => el.remove());
+
+			const existing = new Set(
+				Array.from(
+					tabNav.querySelectorAll<HTMLElement>("[data-books-tab]"),
+				).map((btn) => btn.dataset.booksTab || ""),
+			);
+			const template = root.querySelector<HTMLTemplateElement>(
+				"[data-books-category-template]",
+			);
+			const manualCategories = [...new Set(books.map((book) => book.category))];
+
+			for (const category of manualCategories) {
+				if (existing.has(category)) continue;
+				const btn = template?.content.firstElementChild?.cloneNode(
+					true,
+				) as HTMLButtonElement | undefined;
+				if (!btn) continue;
+				btn.dataset.booksTab = category;
+				btn.dataset.manualTab = "1";
+				const label = btn.querySelector<HTMLElement>("[data-manual-tab-label]");
+				if (label) label.textContent = category;
+				tabNav.appendChild(btn);
+				existing.add(category);
+			}
+
+			if (activeCat !== "all" && !existing.has(activeCat)) {
+				const allBtn = tabNav.querySelector<HTMLElement>('[data-books-tab="all"]');
+				const indicator = tabNav.querySelector<HTMLElement>(
+					"[data-books-tab-indicator]",
+				);
+				if (allBtn) {
+					activateBtn(
+						Array.from(
+							tabNav.querySelectorAll<HTMLElement>("[data-books-tab]"),
+						),
+						allBtn,
+						indicator,
+					);
+				}
+			}
+		}
+
+		function updateCounts() {
+			const staticCards = getStaticCards();
+			const manualTotal = books.length;
+			const total = staticCards.length + manualTotal;
+
+			tabNav
+				.querySelectorAll<HTMLElement>("[data-books-tab]")
+				.forEach((btn) => {
+					const value = btn.dataset.booksTab || "all";
+					const staticCount =
+						value === "all"
+							? staticCards.length
+							: staticCards.filter(
+									(el) => el.dataset.booksItemCat === value,
+								).length;
+					const manualCount =
+						value === "all"
+							? manualTotal
+							: books.filter((book) => book.category === value).length;
+					const badge = btn.querySelector<HTMLElement>(".tools-tab-badge");
+					if (badge) badge.textContent = String(staticCount + manualCount);
+				});
+
+			statusNav
+				.querySelectorAll<HTMLElement>("[data-books-status]")
+				.forEach((btn) => {
+					const value = btn.dataset.booksStatus || "all";
+					const staticCount =
+						value === "all"
+							? staticCards.length
+							: staticCards.filter(
+									(el) => el.dataset.booksItemStatus === value,
+								).length;
+					const manualCount =
+						value === "all"
+							? manualTotal
+							: books.filter(
+									(book) => STATUS_META[book.status]?.value === value,
+								).length;
+					const badge = btn.querySelector<HTMLElement>(".tools-tab-badge");
+					if (badge) badge.textContent = String(staticCount + manualCount);
+				});
+
+			if (emptyHint) emptyHint.hidden = total > 0;
+
+			const countByStatus = (value: string) =>
+				staticCards.filter((el) => el.dataset.booksItemStatus === value).length +
+				books.filter((book) => STATUS_META[book.status]?.value === value).length;
+
+			const stats: Record<string, number> = {
+				read: countByStatus("collect"),
+				reading: countByStatus("doing"),
+				wish: countByStatus("wish"),
+			};
+			for (const [key, value] of Object.entries(stats)) {
+				const el = document.querySelector<HTMLElement>(
+					`[data-books-stat="${key}"]`,
+				);
+				if (el) el.textContent = String(value);
+			}
+		}
+
+		async function removeBook(button: HTMLElement) {
+			const item = button.closest<HTMLElement>("[data-manual-book-id]");
+			const id = item?.dataset.manualBookId;
+			const book = books.find((entry) => entry.id === id);
+			if (!id || !book) return;
+			if (!window.confirm(`删除「${book.title}」？该操作不可恢复。`)) return;
+
+			try {
+				await deleteManualBook(id);
+			} catch {
+				toast("删除失败，可能是浏览器存储不可用");
+				return;
+			}
+			if (token !== initToken) return;
+
+			books = books.filter((entry) => entry.id !== id);
+			renderCards();
+			rebuildCategoryTabs();
+			updateCounts();
+			initIndicators();
+			applyFilter();
+			toast("已删除");
+		}
+
+		async function loadBooks() {
+			try {
+				const records = await listManualBooks();
+				if (token !== initToken) return;
+				books = records;
+			} catch {
+				if (token !== initToken) return;
+				books = [];
+				toast("浏览器不支持本地存储（IndexedDB 被禁用？）");
+			}
+
+			renderCards();
+			rebuildCategoryTabs();
+			updateCounts();
+			initIndicators();
+			applyFilter();
+		}
+
+		// ── 事件绑定 ──
+		root.addEventListener(
+			"click",
+			(event) => {
+				const target = event.target as HTMLElement | null;
+				if (!target) return;
+
+				const deleteBtn = target.closest<HTMLElement>(
+					"[data-manual-book-delete]",
+				);
+				if (deleteBtn) {
+					void removeBook(deleteBtn);
+					return;
+				}
+
+				const noLink = target.closest<HTMLAnchorElement>(
+					"a[data-manual-no-link='1']",
+				);
+				if (noLink) event.preventDefault();
+
+				const tab = target.closest<HTMLElement>("[data-books-tab]");
+				if (tab) {
+					const nav = tab.closest<HTMLElement>("[data-books-tab-nav]");
+					const indicator = nav?.querySelector<HTMLElement>(
+						"[data-books-tab-indicator]",
+					) ?? null;
+					activateBtn(
+						Array.from(
+							nav?.querySelectorAll<HTMLElement>("[data-books-tab]") ?? [],
+						),
+						tab,
+						indicator,
+					);
+					applyFilter();
+					return;
+				}
+
+				const statusBtn = target.closest<HTMLElement>("[data-books-status]");
+				if (statusBtn) {
+					const nav = statusBtn.closest<HTMLElement>("[data-books-status-nav]");
+					const indicator = nav?.querySelector<HTMLElement>(
+						"[data-books-status-indicator]",
+					) ?? null;
+					activateBtn(
+						Array.from(
+							nav?.querySelectorAll<HTMLElement>("[data-books-status]") ?? [],
+						),
+						statusBtn,
+						indicator,
+					);
+					applyFilter();
+					return;
+				}
+
+				if (target.closest("[data-books-modal-close]")) closeModal();
+			},
+			{ signal },
+		);
+
+		addBtn?.addEventListener("click", openModal, { signal });
+
+		coverBtn.addEventListener("click", () => coverInput.click(), { signal });
+
+		coverInput.addEventListener(
+			"change",
+			() => {
+				const file = coverInput.files?.[0];
+				coverInput.value = "";
+				if (!file) return;
+				if (!file.type.startsWith("image/")) {
+					showError("封面必须是图片文件");
+					return;
+				}
+				clearError();
+				setCover(file);
+			},
+			{ signal },
+		);
+
+		coverClear.addEventListener(
+			"click",
+			() => {
+				coverInput.value = "";
+				setCover(null);
+			},
+			{ signal },
+		);
+
+		form.addEventListener(
+			"submit",
+			(event) => {
+				event.preventDefault();
+				const title = titleInput.value.trim();
+				if (!title) {
+					showError("请填写书名");
+					titleInput.focus();
+					return;
+				}
+
+				let score = Number.parseFloat(scoreInput.value);
+				if (!Number.isFinite(score)) score = 0;
+				score = Math.min(10, Math.max(0, score));
+
+				let status = Number.parseInt(statusSelect.value, 10);
+				if (!STATUS_META[status]) status = 1;
+
+				const category = categoryInput.value.trim() || "未分类";
+				const now = Date.now();
+				const book: ManualBook = {
+					id: createRecordId(),
+					title,
+					cover: coverFile,
+					link: normalizeLink(linkInput.value),
+					status,
+					score,
+					category,
+					createdAt: now,
+					updatedAt: now,
+				};
+
+				clearError();
+				void (async () => {
+					try {
+						await saveManualBook(book);
+					} catch {
+						showError("保存失败，可能是浏览器存储空间不足");
+						return;
+					}
+					if (token !== initToken) return;
+
+					books = [book, ...books].sort(
+						(a, b) => b.createdAt - a.createdAt,
+					);
+					closeModal();
+					renderCards();
+					rebuildCategoryTabs();
+					updateCounts();
+					initIndicators();
+					applyFilter();
+					toast("已添加到书架");
+				})();
+			},
+			{ signal },
+		);
+
+		document.addEventListener(
+			"keydown",
+			(event) => {
+				if (event.key === "Escape" && !modal.hidden) closeModal();
+			},
+			{ signal },
+		);
+
+		window.addEventListener("resize", initIndicators, { signal });
+		window.addEventListener(
+			"pagehide",
+			() => {
+				releaseCardUrls();
+				if (coverUrl) {
+					URL.revokeObjectURL(coverUrl);
+					coverUrl = "";
+				}
+			},
+			{ signal },
+		);
+
+		void loadBooks();
+	}
+
+	initBookshelf();
+	document.addEventListener("astro:page-load", initBookshelf);
+	document.addEventListener("swup:content:replaced", initBookshelf);
+</script>
+
+<style>
+	.bookshelf {
+		padding: 4px 0 8px;
+	}
+
+	/* 分类/状态筛选（影视页同款胶囊，边框 1.5px 略细于原版 2px） */
+	.books-filter-pill {
+		position: relative;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		padding: 0.375rem;
+		border-radius: 1rem;
+		border: 1.5px solid #000;
+		margin-bottom: 0.875rem;
+	}
+	:root.dark .books-filter-pill {
+		border-color: #fff;
+	}
+
+	.books-status-pill {
+		margin-bottom: 1.25rem;
+	}
+
+	.tools-tab-indicator {
+		position: absolute;
+		border-radius: 9999px;
+		background: #000;
+		transition:
+			left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+			top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+			width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+			height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		opacity: 0;
+		pointer-events: none;
+		z-index: 0;
+	}
+	:root.dark .tools-tab-indicator {
+		background: #fff;
+	}
+
+	.tools-tab-btn {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.875rem;
+		border: none;
+		border-radius: 9999px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		white-space: nowrap;
+		cursor: pointer;
+		background: transparent;
+		transition: color 0.2s;
+		flex-shrink: 0;
+		font-family: inherit;
+	}
+
+	.tools-tab-btn-active {
+		color: #fff;
+		cursor: default;
+	}
+	:root.dark .tools-tab-btn-active {
+		color: #000;
+	}
+
+	.tools-tab-btn-inactive {
+		color: #000;
+	}
+	.tools-tab-btn-inactive:hover {
+		opacity: 0.7;
+	}
+	:root.dark .tools-tab-btn-inactive {
+		color: #fff;
+	}
+
+	.tools-tab-badge {
+		font-size: 0.65rem;
+		padding: 0.0625rem 0.375rem;
+		border-radius: 9999px;
+		background: oklch(0.92 0 0);
+		color: oklch(0.35 0 0);
+		line-height: 1.4;
+	}
+	:root.dark .tools-tab-badge {
+		background: oklch(0.25 0 0);
+		color: oklch(0.65 0 0);
+	}
+
+	.tools-tab-btn-active .tools-tab-badge {
+		background: rgba(255, 255, 255, 0.25);
+		color: #fff;
+	}
+	:root.dark .tools-tab-btn-active .tools-tab-badge {
+		background: rgba(0, 0, 0, 0.2);
+		color: #000;
+	}
+
+	/* 桌面 5 列、移动端 3 列（1fr 自适应列宽，书厚 left 定位不依赖固定书宽）
+	   外框与上方筛选胶囊同款黑色线框 + 大圆角（1.5px，略细于胶囊原版），把整片书架框住 */
+	.shelf-grid {
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		gap: 24px 16px;
+		padding: 20px 16px;
+		border: 1.5px solid #000;
+		border-radius: 1rem;
+		margin-bottom: 0.5rem;
+		--shelf-book-depth: 42px;
+	}
+	:root.dark .shelf-grid {
+		border-color: #fff;
+	}
+
+	.shelf-item {
+		position: relative;
+		min-width: 0;
+	}
+
+	.shelf-item:hover {
+		z-index: 3;
+	}
+
+	/* 手动书籍的删除入口：桌面悬浮显示，触屏设备常驻 */
+	.manual-book-delete {
+		position: absolute;
+		top: -0.4rem;
+		right: -0.4rem;
+		z-index: 6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.4rem;
+		height: 1.4rem;
+		padding: 0;
+		border: 1.5px solid #d1495b;
+		border-radius: 9999px;
+		background: var(--page-bg);
+		color: #d1495b;
+		font-size: 0.95rem;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0;
+		transition:
+			opacity 0.2s ease,
+			background-color 0.2s ease,
+			color 0.2s ease;
+	}
+	.shelf-item:hover .manual-book-delete,
+	.manual-book-delete:focus-visible {
+		opacity: 1;
+	}
+	.manual-book-delete:hover {
+		background: #d1495b;
+		color: #fff;
+	}
+	@media (hover: none) {
+		.manual-book-delete {
+			opacity: 1;
+		}
+	}
+
+	/* SSR 首屏防闪烁：桌面隐藏第 11 本起，移动端隐藏第 7 本起（与 ClientPagination 10/6 本每页一致） */
+	.shelf-grid .shelf-item:nth-child(n + 11) {
+		display: none;
+	}
+
+	@media (max-width: 768px) {
+		.shelf-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 20px 10px;
+			padding: 16px 12px;
+			--shelf-book-depth: 30px;
+		}
+
+		.shelf-grid .shelf-item:nth-child(n + 7) {
+			display: none;
+		}
+	}
+
+	/* 空书架提示 */
+	.books-empty {
+		margin: 0.75rem 0 1rem;
+		padding: 2rem 1rem;
+		border: 1.5px dashed var(--line-divider);
+		border-radius: 1rem;
+		color: var(--content-meta);
+		font-size: 0.85rem;
+		text-align: center;
+	}
+	.books-empty[hidden] {
+		display: none;
+	}
+
+	/* 分页与文章列表页 Pagination.astro 保持一致，无额外覆写 */
+
+	/* ── 添加书籍弹层 ── */
+	.books-modal {
+		position: fixed;
+		inset: 0;
+		z-index: 90;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+	}
+	.books-modal[hidden] {
+		display: none;
+	}
+
+	.books-modal__backdrop {
+		position: absolute;
+		inset: 0;
+		background: color-mix(in oklch, #000 42%, transparent);
+	}
+
+	.books-modal__panel {
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		max-width: 32rem;
+		max-height: 90vh;
+		overflow-y: auto;
+		padding: 1.25rem 1.4rem 1.4rem;
+		border: 2px solid var(--deep-text);
+		border-radius: var(--radius-large);
+		background: var(--page-bg);
+		color: var(--deep-text);
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+	}
+
+	.books-modal__head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding-bottom: 0.75rem;
+		margin-bottom: 1rem;
+		border-bottom: 2px solid var(--deep-text);
+	}
+
+	.books-modal__head h2 {
+		margin: 0;
+		font-size: 1.15rem;
+		font-weight: 700;
+		color: var(--deep-text);
+	}
+
+	.books-modal__close {
+		width: 1.9rem;
+		height: 1.9rem;
+		padding: 0;
+		border: 1.5px solid var(--line-divider);
+		border-radius: 9999px;
+		background: transparent;
+		color: var(--deep-text);
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: pointer;
+		transition:
+			background-color 0.2s ease,
+			color 0.2s ease;
+	}
+	.books-modal__close:hover {
+		background: var(--deep-text);
+		color: var(--page-bg);
+	}
+
+	.books-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		margin-bottom: 0.85rem;
+	}
+
+	.books-field__label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--content-meta);
+	}
+	.books-field__label em {
+		color: #d1495b;
+		font-style: normal;
+	}
+
+	.books-field input,
+	.books-field select {
+		width: 100%;
+		min-width: 0;
+		padding: 0.45rem 0.65rem;
+		border: 1.5px solid var(--line-divider);
+		border-radius: 0.6rem;
+		outline: none;
+		background: transparent;
+		color: var(--deep-text);
+		font-size: 0.85rem;
+		transition: border-color 0.2s ease;
+	}
+
+	.books-field input:focus,
+	.books-field select:focus {
+		border-color: var(--deep-text);
+	}
+
+	.books-field input::placeholder {
+		color: var(--content-meta);
+	}
+
+	.books-field-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.75rem;
+	}
+
+	.books-cover {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.books-cover__preview {
+		width: 4.2rem;
+		aspect-ratio: 25 / 36;
+		border: 1px solid var(--line-divider);
+		border-radius: 0.35rem;
+		object-fit: cover;
+	}
+	.books-cover__preview[hidden] {
+		display: none;
+	}
+
+	.books-cover__name {
+		flex: 1 1 9rem;
+		min-width: 0;
+		overflow: hidden;
+		color: var(--content-meta);
+		font-size: 0.7rem;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.books-mini-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3rem;
+		padding: 0.38rem 0.75rem;
+		border: 1.5px solid var(--deep-text);
+		border-radius: 0.6rem;
+		background: transparent;
+		color: var(--deep-text);
+		font-size: 0.78rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background-color 0.2s ease,
+			color 0.2s ease,
+			border-color 0.2s ease;
+	}
+
+	.books-mini-btn:hover {
+		background: var(--deep-text);
+		color: var(--page-bg);
+	}
+
+	.books-mini-btn--primary {
+		background: var(--deep-text);
+		color: var(--page-bg);
+	}
+	.books-mini-btn--primary:hover {
+		background: transparent;
+		color: var(--deep-text);
+	}
+
+	.books-mini-btn--danger {
+		border-color: #d1495b;
+		color: #d1495b;
+	}
+	.books-mini-btn--danger:hover {
+		background: #d1495b;
+		border-color: #d1495b;
+		color: #fff;
+	}
+
+	.books-form-error {
+		margin: 0 0 0.75rem;
+		padding: 0.4rem 0.6rem;
+		border-radius: 0.5rem;
+		background: color-mix(in oklch, #d1495b 12%, transparent);
+		color: #d1495b;
+		font-size: 0.75rem;
+	}
+	.books-form-error[hidden] {
+		display: none;
+	}
+
+	.books-modal__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		padding-top: 0.75rem;
+		border-top: 1px dashed var(--line-divider);
+	}
+
+	.books-toast {
+		position: fixed;
+		left: 50%;
+		bottom: 6rem;
+		z-index: 95;
+		padding: 0.5rem 1rem;
+		border-radius: 9999px;
+		background: var(--deep-text);
+		color: var(--page-bg);
+		font-size: 0.8125rem;
+		transform: translate(-50%, 0.5rem);
+		opacity: 0;
+		pointer-events: none;
+		transition:
+			opacity 0.25s ease,
+			transform 0.25s ease;
+	}
+	.books-toast.is-visible {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+
+	@media (max-width: 480px) {
+		.books-field-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

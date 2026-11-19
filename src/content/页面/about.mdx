@@ -1,0 +1,43 @@
+import AboutChatBubble from "@/components/about/AboutChatBubble.astro";
+import AboutProfileCard from "@/components/about/AboutProfileCard.astro";
+import AboutSocialLinks from "@/components/about/AboutSocialLinks.astro";
+import AboutTechStack from "@/components/about/AboutTechStack.astro";
+import AboutTimeline from "@/components/about/AboutTimeline.astro";
+
+## 关于我 / About Me
+
+你好呀，这里是<AboutProfileCard id="aurora" trigger="Aurora" name="Aurora" role="记录者 / 生活观察员" description="把喜欢的东西慢慢收进来，这里是我的小小宇宙。" avatar="/assets/ziyuan/aurora-avatar.jpg" />的小窝。
+
+欢迎来到我的世界。这里会写一些日常、一些想法，还有那些不太想忘记的瞬间。
+
+平常写点算法题，目前在学习 Java 开发。
+
+### Q1：这个站点用到了哪些技术栈？
+
+骨架是 `Astro`，交互是 `Svelte`，样式是 `Tailwind CSS`，换页靠 `Swup` 做无缝过渡，搜索用 `Pagefind`。
+
+具体用了哪些技术，点开下面看看吧：
+
+<AboutTechStack />
+
+小卡片里藏着的，就是把这个小窝搭起来的工具与依赖。
+
+这个小窝的搭建过程也记在下面这条时间线里：
+
+<AboutTimeline />
+
+### Q2：怎么找到我？
+
+简介和社交链接都在这里，随时可以来打个招呼：
+
+<AboutSocialLinks />
+
+也可以在友链或邮件里留言，我都会看到。
+
+### Q3：站点的代码开源吗？
+
+<AboutChatBubble>主题是开源的，我也把改动后的代码放在 GitHub 上，欢迎围观。</AboutChatBubble>
+
+特别感谢原作者 [tianshihao2003](https://github.com/tianshihao2003) 的开源分享，让我能够在他的作品基础上搭建并不断完善这个小窝。
+
+::github{repo="tianshihao2003/dumplingandcakeblog"}

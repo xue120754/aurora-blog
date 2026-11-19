@@ -1,0 +1,23 @@
+---
+import { getCollection } from "astro:content";
+import { isPublicPost } from "../utils/content-utils";
+import { getPostUrlBySlug, removeFileExtension } from "../utils/url-utils";
+
+const posts = await getCollection("posts", ({ data }) => isPublicPost(data));
+---
+
+<html>
+<body>
+  <h1>Post IDs and URLs</h1>
+  <ul>
+    {posts.map(post => (
+      <li>
+        ID: {post.id} <br/>
+        Slug: {removeFileExtension(post.id)} <br/>
+        URL: {getPostUrlBySlug(post.id)} <br/>
+        <a href={getPostUrlBySlug(post.id)}>Go to Post</a>
+      </li>
+    ))}
+  </ul>
+</body>
+</html>

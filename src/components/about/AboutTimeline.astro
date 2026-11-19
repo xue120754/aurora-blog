@@ -1,0 +1,35 @@
+---
+interface Milestone {
+	date: string;
+	title: string;
+	desc: string;
+	tag?: string;
+}
+
+const milestones: Milestone[] = [
+	{
+		date: "2026.11.18",
+		title: "开始搭建",
+		desc: "今天开始在原作者的开源项目基础上搭建属于 Aurora 的小窝。",
+		tag: "起点",
+	},
+];
+---
+
+<section class="about-timeline" aria-label="站点更新时间线">
+	<ol class="about-timeline__list">
+		{milestones.map((milestone, index) => (
+			<li class="about-timeline__item" style={`--i: ${index};`}>
+				<span class="about-timeline__date">{milestone.date}</span>
+				<span class="about-timeline__rail" aria-hidden="true"><span class="about-timeline__dot"></span></span>
+				<div class="about-timeline__card">
+					<div class="about-timeline__card-head">
+						<span class="about-timeline__title">{milestone.title}</span>
+						{milestone.tag && <span class="about-timeline__tag">{milestone.tag}</span>}
+					</div>
+					<p class="about-timeline__desc">{milestone.desc}</p>
+				</div>
+			</li>
+		))}
+	</ol>
+</section>
