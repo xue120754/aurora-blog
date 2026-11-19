@@ -14,7 +14,7 @@ export const siteConfig: SiteConfig = {
 	subtitle: "",
 
 	// 站点 URL（域名确定后替换此处）
-	site_url: "https://aurora.example.com",
+	site_url: "https://xuegost.top",
 
 	// 站点描述
 	description:
