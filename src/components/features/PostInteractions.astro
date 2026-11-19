@@ -1,0 +1,357 @@
+---
+interface Props {
+	slug: string;
+}
+
+const { slug } = Astro.props;
+---
+
+<!-- 点赞 + 匿名评论（数据存 Cloudflare D1，访客免注册） -->
+<section class="post-interactions" data-slug={slug} id="post-interactions">
+	<div class="pi-like-row">
+		<button type="button" class="pi-like-btn" id="pi-like-btn" aria-pressed="false">
+			<span class="pi-like-icon" aria-hidden="true">♡</span>
+			<span class="pi-like-label">点赞</span>
+			<span class="pi-like-count" id="pi-like-count">0</span>
+		</button>
+	</div>
+
+	<div class="pi-comments">
+		<h3 class="pi-title">评论 <span class="pi-count" id="pi-comment-count">0</span></h3>
+
+		<form class="pi-form" id="pi-form" autocomplete="off">
+			<input
+				class="pi-input"
+				id="pi-nick"
+				name="nick"
+				type="text"
+				maxlength="24"
+				placeholder="你的昵称"
+				required
+			/>
+			<textarea
+				class="pi-textarea"
+				id="pi-content"
+				name="content"
+				maxlength="1000"
+				rows="3"
+				placeholder="说点什么…（无需登录）"
+				required></textarea>
+			<div class="pi-form-foot">
+				<span class="pi-hint" id="pi-hint">昵称和内容会公开显示</span>
+				<button class="pi-submit" type="submit" id="pi-submit">发表</button>
+			</div>
+		</form>
+
+		<ul class="pi-list" id="pi-list"></ul>
+		<p class="pi-empty" id="pi-empty" hidden>还没有评论，来说第一句吧。</p>
+	</div>
+</section>
+
+<script is:inline>
+	(function () {
+		if (window.__auroraInteractionsBound) return;
+		window.__auroraInteractionsBound = true;
+
+		var API = "/api";
+
+		function visitorId() {
+			try {
+				var id = localStorage.getItem("aurora_visitor_id");
+				if (!id || id.length < 8) {
+					id =
+						typeof crypto !== "undefined" && crypto.randomUUID
+							? crypto.randomUUID()
+							: "v-" + Date.now() + "-" + Math.random().toString(16).slice(2, 10);
+					localStorage.setItem("aurora_visitor_id", id);
+				}
+				return id;
+			} catch (e) {
+				return "v-" + Date.now() + "-" + Math.random().toString(16).slice(2, 10);
+			}
+		}
+
+		function esc(s) {
+			return String(s).replace(/[&<>"']/g, function (c) {
+				return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+			});
+		}
+
+		function fmt(ts) {
+			var d = new Date(ts);
+			var p = function (n) { return String(n).padStart(2, "0"); };
+			return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+		}
+
+		function init() {
+			var root = document.getElementById("post-interactions");
+			if (!root) return;
+			var slug = root.dataset.slug || "";
+			if (!slug) return;
+
+			var likeBtn = root.querySelector("#pi-like-btn");
+			var likeCount = root.querySelector("#pi-like-count");
+			var form = root.querySelector("#pi-form");
+			var nickEl = root.querySelector("#pi-nick");
+			var contentEl = root.querySelector("#pi-content");
+			var submitBtn = root.querySelector("#pi-submit");
+			var hint = root.querySelector("#pi-hint");
+			var list = root.querySelector("#pi-list");
+			var empty = root.querySelector("#pi-empty");
+			var countEl = root.querySelector("#pi-comment-count");
+
+			var likedKey = "aurora_liked_" + slug;
+			var savedNick = localStorage.getItem("aurora_nick") || "";
+			if (savedNick && !nickEl.value) nickEl.value = savedNick;
+
+			function markLiked() {
+				likeBtn.classList.add("is-liked");
+				likeBtn.setAttribute("aria-pressed", "true");
+				likeBtn.querySelector(".pi-like-icon").textContent = "♥";
+				likeBtn.querySelector(".pi-like-label").textContent = "已点赞";
+			}
+			if (localStorage.getItem(likedKey) === "1") markLiked();
+
+			fetch(API + "/likes?slug=" + encodeURIComponent(slug))
+				.then(function (r) { return r.json(); })
+				.then(function (d) { likeCount.textContent = d.count ?? 0; })
+				.catch(function () {});
+
+			likeBtn.addEventListener("click", function () {
+				if (localStorage.getItem(likedKey) === "1") {
+					hint.textContent = "你已经点过赞了 🙂";
+					return;
+				}
+				likeBtn.disabled = true;
+				fetch(API + "/likes", {
+					method: "POST",
+					headers: { "Content-Type": "application/json", "X-Visitor-Id": visitorId() },
+					body: JSON.stringify({ slug: slug }),
+				})
+					.then(function (r) { return r.json(); })
+					.then(function (d) {
+						likeCount.textContent = d.count ?? 0;
+						localStorage.setItem(likedKey, "1");
+						markLiked();
+					})
+					.catch(function () { hint.textContent = "点赞失败，稍后再试"; })
+					.finally(function () { likeBtn.disabled = false; });
+			});
+
+			function renderComments(items) {
+				countEl.textContent = items.length;
+				if (!items.length) {
+					list.innerHTML = "";
+					empty.hidden = false;
+					return;
+				}
+				empty.hidden = true;
+				list.innerHTML = items
+					.map(function (c) {
+						return (
+							'<li class="pi-item">' +
+							'<div class="pi-item-head"><b>' + esc(c.nick) + "</b><time>" + fmt(c.created_at) + "</time></div>" +
+							'<p class="pi-item-body">' + esc(c.content).replace(/\n/g, "<br>") + "</p>" +
+							"</li>"
+						);
+					})
+					.join("");
+			}
+
+			function loadComments() {
+				fetch(API + "/comments?slug=" + encodeURIComponent(slug))
+					.then(function (r) { return r.json(); })
+					.then(function (d) { renderComments(d.comments || []); })
+					.catch(function () {});
+			}
+			loadComments();
+
+			form.addEventListener("submit", function (e) {
+				e.preventDefault();
+				var nick = nickEl.value.trim();
+				var content = contentEl.value.trim();
+				if (!nick || !content) return;
+				submitBtn.disabled = true;
+				submitBtn.textContent = "发送中…";
+				fetch(API + "/comments", {
+					method: "POST",
+					headers: { "Content-Type": "application/json", "X-Visitor-Id": visitorId() },
+					body: JSON.stringify({ slug: slug, nick: nick, content: content }),
+				})
+					.then(function (r) {
+						return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+					})
+					.then(function (res) {
+						if (!res.ok) {
+							hint.textContent = res.d.error || "发表失败";
+							return;
+						}
+						localStorage.setItem("aurora_nick", nick);
+						contentEl.value = "";
+						hint.textContent = "已发表 ✓";
+						loadComments();
+					})
+					.catch(function () { hint.textContent = "网络异常，稍后再试"; })
+					.finally(function () {
+						submitBtn.disabled = false;
+						submitBtn.textContent = "发表";
+					});
+			});
+		}
+
+		document.addEventListener("DOMContentLoaded", init, { once: true });
+		window.addEventListener("astro:page-load", init);
+		window.addEventListener("swup:content:replaced", init);
+		if (document.readyState !== "loading") init();
+	})();
+</script>
+
+<style is:global>
+	.post-interactions {
+		margin-top: 2.5rem;
+		padding-top: 1.5rem;
+		border-top: 1px dashed var(--line-divider);
+	}
+	.pi-like-row {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 1.6rem;
+	}
+	.pi-like-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1.4rem;
+		border-radius: 999px;
+		border: 1.5px solid var(--line-divider);
+		background: var(--btn-regular-bg);
+		color: var(--deep-text);
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.18s ease;
+		font-family: inherit;
+	}
+	.pi-like-btn:hover {
+		border-color: var(--primary);
+		color: var(--primary);
+	}
+	.pi-like-btn.is-liked {
+		border-color: #e8899b;
+		color: #e8899b;
+	}
+	.pi-like-icon {
+		font-size: 1.15rem;
+		line-height: 1;
+	}
+	.pi-like-count {
+		min-width: 1.2em;
+		text-align: center;
+		opacity: 0.75;
+		font-variant-numeric: tabular-nums;
+	}
+	.pi-title {
+		font-size: 1.05rem;
+		font-weight: 700;
+		margin: 0 0 1rem;
+		color: var(--deep-text);
+	}
+	.pi-count {
+		opacity: 0.55;
+		font-weight: 400;
+		font-size: 0.9rem;
+	}
+	.pi-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		margin-bottom: 1.6rem;
+	}
+	.pi-input,
+	.pi-textarea {
+		width: 100%;
+		padding: 0.65rem 0.9rem;
+		border-radius: 0.7rem;
+		border: 1.5px solid var(--line-divider);
+		background: var(--card-bg-transparent);
+		color: var(--deep-text);
+		font-family: inherit;
+		font-size: 0.92rem;
+		transition: border-color 0.15s;
+	}
+	.pi-input:focus,
+	.pi-textarea:focus {
+		outline: none;
+		border-color: var(--primary);
+	}
+	.pi-textarea {
+		resize: vertical;
+		min-height: 5rem;
+	}
+	.pi-form-foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
+	}
+	.pi-hint {
+		font-size: 0.78rem;
+		color: var(--content-meta);
+	}
+	.pi-submit {
+		padding: 0.5rem 1.3rem;
+		border-radius: 0.7rem;
+		border: none;
+		background: var(--primary);
+		color: #fff;
+		font-weight: 600;
+		font-size: 0.9rem;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.pi-submit:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+	.pi-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+	}
+	.pi-item {
+		padding: 0.75rem 0.9rem;
+		border-radius: 0.7rem;
+		background: var(--btn-regular-bg);
+	}
+	.pi-item-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.6rem;
+		margin-bottom: 0.35rem;
+		font-size: 0.85rem;
+	}
+	.pi-item-head b {
+		color: var(--deep-text);
+	}
+	.pi-item-head time {
+		color: var(--content-meta);
+		font-size: 0.76rem;
+	}
+	.pi-item-body {
+		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.7;
+		color: var(--deep-text);
+		word-break: break-word;
+	}
+	.pi-empty {
+		text-align: center;
+		font-size: 0.85rem;
+		color: var(--content-meta);
+		padding: 1rem 0;
+	}
+</style>

@@ -73,10 +73,15 @@ const footprintData = JSON.stringify({ locations: footprintLocations });
 
 <MainGridLayout title='去过的地方' description='足迹地图与旅行记录'>
   <link slot="head" rel="stylesheet" href="/footprint/static/css/footprintmap.css">
-  <script is:inline slot="head" define:vars={{ footprintData }}>
+  <script is:inline slot="head" define:vars={{ footprintData, amapSecurity: import.meta.env.PUBLIC_AMAP_SECURITY_CODE }}>
 // 足迹地图初始化脚本
 // 放在 head 中，Swup 导航时 @swup/head-plugin 会重新执行此脚本
 var _footprintInit = false;
+
+			// 高德 JS API 2.0 需要安全密钥（securityJsCode），必须在地图脚本加载前设置
+			if (typeof amapSecurity === "string" && amapSecurity) {
+				window._AMapSecurityConfig = { securityJsCode: amapSecurity };
+			}
 
 function _fpLoadScript(src, globalCheck) {
   return new Promise(function(resolve, reject) {

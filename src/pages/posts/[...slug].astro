@@ -6,6 +6,7 @@ import Markdown from "@components/common/Markdown.astro";
 import KatexManager from "@components/features/KatexManager.astro";
 import License from "@components/misc/License.astro";
 import RelatedPosts from "@components/misc/RelatedPosts.astro";
+import PostInteractions from "@components/features/PostInteractions.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
@@ -471,6 +472,7 @@ const jsonLd = {
   <!-- 评论 -->
   <div class="post-nonprint">
     {entry.data.comment && <Comment post={entry} />}
+			<PostInteractions slug={entry.id} />
   </div>
 </MainGridLayout>
 
