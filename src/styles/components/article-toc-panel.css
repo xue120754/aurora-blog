@@ -16,7 +16,7 @@
 	display: none;
 }
 
-@media (min-width: 101rem) and (hover: hover) and (pointer: fine) {
+@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
 	.article-toc-panel {
 		--article-toc-active: #0e7490;
 		--article-toc-panel-bg: var(--page-bg);
