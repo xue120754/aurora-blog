@@ -1,0 +1,46 @@
+name: Deploy to Cloudflare Pages
+
+# 推送 main 分支（或在后台点「发布」触发 commit）后：
+#   安装依赖 → 构建 → 上传到 Cloudflare Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build & Deploy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          # 这两个是公开信息（会出现在页面 HTML 里），不是密钥
+          PUBLIC_AMAP_KEY: 0b8c9bdb63f354286c9dd85a37269f0c
+          PUBLIC_AMAP_KEY_PLACES: 0b8c9bdb63f354286c9dd85a37269f0c
+          PUBLIC_AMAP_SECURITY_CODE: 0ef5af6651113a8d9c95c91a4c9f24c6
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=aurora-blog --branch=main

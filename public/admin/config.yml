@@ -1,0 +1,184 @@
+# ============================================================
+# Decap CMS 配置 —— Aurora 的博客
+# 站点：https://xuegost.top    仓库：xue120754/aurora-blog
+# ============================================================
+#
+# 字段必须与 src/content.config.ts 的 zod schema 对齐，
+# 否则未声明的字段在保存时会被丢弃。
+
+backend:
+  name: github
+  repo: xue120754/aurora-blog
+  branch: main
+  # Cloudflare Worker 提供的 GitHub OAuth 中转（见 decap-oauth worker）
+  base_url: https://decap-oauth.你的子域.workers.dev
+  auth_endpoint: auth
+  commit_messages:
+    create: "cms: 新建「{{slug}}」"
+    update: "cms: 更新「{{slug}}」"
+    delete: "cms: 删除「{{slug}}」"
+    uploadMedia: "cms: 上传图片 {{path}}"
+    deleteMedia: "cms: 删除图片 {{path}}"
+
+site_url: https://xuegost.top
+display_url: https://xuegost.top
+logo_url: https://xuegost.top/favicon/favicon-light-192.png
+
+locale: zh_Hans
+publish_mode: simple
+
+# 默认媒体库：文章封面
+media_folder: public/assets/images/covers
+public_folder: /assets/images/covers
+
+collections:
+  # ---------------- 文章 ----------------
+  - name: posts
+    label: 博客文章
+    label_singular: 文章
+    folder: src/content/文章
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    slug: "{{slug}}"
+    summary: "{{title}}"
+    sortable_fields: [published, title]
+    # 分类 = 文件夹路径，必须用 nested 才能保住分类
+    nested:
+      depth: 2
+      subfolders: false
+    meta:
+      path:
+        widget: string
+        label: 分类目录
+        hint: 文件夹名就是分类名（技术分享 / 生活随笔）；想开新分类直接写新名字
+        required: false
+    fields:
+      - { label: 标题, name: title, widget: string }
+      - label: 发布日期
+        name: published
+        widget: datetime
+        date_format: "YYYY-MM-DD"
+        time_format: false
+        picker_utc: true
+      - label: 更新日期
+        name: updated
+        widget: datetime
+        date_format: "YYYY-MM-DD"
+        time_format: false
+        picker_utc: true
+        required: false
+      - label: 摘要
+        name: description
+        widget: text
+        required: false
+        hint: 留空则由主题自动截取正文
+      - label: 封面图
+        name: image
+        widget: image
+        required: false
+        hint: /assets/images/covers/xxx.webp，或用右侧按钮上传
+      - label: 标签
+        name: tags
+        widget: list
+        required: false
+        default: []
+      - { label: 置顶, name: pinned, widget: boolean, default: false }
+      - { label: 草稿, name: draft, widget: boolean, default: false }
+      - { label: 私密（不公开）, name: private, widget: boolean, default: false }
+      - label: 允许下载原文
+        name: downloadable
+        widget: boolean
+        default: false
+        hint: 打开后文章页会出现「下载 Markdown」按钮
+      - label: 语言
+        name: lang
+        widget: select
+        required: false
+        default: ""
+        options:
+          - { label: 中文, value: "" }
+          - { label: English, value: "en" }
+          - { label: 日本語, value: "ja" }
+          - { label: 繁體中文, value: "zh_TW" }
+      - { label: 正文, name: body, widget: markdown }
+
+  # ---------------- 动态（说说） ----------------
+  - name: moments
+    label: 动态
+    label_singular: 一条动态
+    folder: src/content/动态
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    slug: "{{year}}-{{month}}-{{day}}-{{hour}}{{minute}}"
+    summary: "{{published}}"
+    fields:
+      - label: 发布时间
+        name: published
+        widget: datetime
+        date_format: "YYYY-MM-DD"
+        time_format: "HH:mm:ss"
+        picker_utc: false
+      - { label: 作者, name: author, widget: string, default: Aurora, required: false }
+      - { label: 头像, name: avatar, widget: string, default: /assets/ziyuan/aurora-avatar.jpg, required: false }
+      - label: 标签
+        name: tags
+        widget: list
+        required: false
+        default: []
+      - { label: 置顶, name: pinned, widget: boolean, default: false }
+      - { label: 地点, name: location, widget: string, required: false }
+      - { label: 设备, name: device, widget: string, required: false }
+      - label: 私密（不公开）
+        name: private
+        widget: boolean
+        default: false
+      - label: 内容
+        name: body
+        widget: markdown
+        hint: 图片用 ![](图片地址) 写进正文，一行一张（alt 留空）
+
+  # ---------------- 相册 ----------------
+  - name: album
+    label: 相册
+    label_singular: 一个相册
+    folder: src/content/相册
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    slug: "{{slug}}"
+    summary: "{{title}}"
+    fields:
+      - { label: 标题, name: title, widget: string }
+      - { label: 副标题, name: subtitle, widget: string, required: false }
+      - label: 日期
+        name: date
+        widget: datetime
+        date_format: "YYYY-MM-DD"
+        time_format: false
+        picker_utc: true
+      - { label: 地点, name: location, widget: string, required: false }
+      - label: 标签
+        name: tags
+        widget: list
+        required: false
+        default: []
+      - label: 图床文件夹
+        name: imgbedFolder
+        widget: string
+        required: false
+        hint: 例如 blog/album/日常碎片，留空则用静态 photos 列表
+      - label: 照片
+        name: photos
+        widget: list
+        required: false
+        default: []
+        fields:
+          - { label: 图片地址, name: src, widget: string }
+          - { label: 替代文字, name: alt, widget: string, required: false }
+          - { label: 说明, name: caption, widget: string, required: false }
+      - { label: 正文, name: body, widget: markdown, required: false }
