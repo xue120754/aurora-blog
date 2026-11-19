@@ -216,7 +216,8 @@
             return new Promise((resolve, reject) => {
                 const s = document.createElement('script');
                 s.src = `https://webapi.amap.com/maps?v=2.0&key=${this.apiKey}`;
-                s.onload = () => { window._AMapSecurityConfig = { securityJsCode: '' }; resolve(); };
+                // 安全密钥由页面在加载前注入，这里绝不能再覆盖（原来写成空字符串会导致 INVALID_USER_SCODE）
+                s.onload = () => { resolve(); };
                 s.onerror = reject;
                 document.head.appendChild(s);
             });
