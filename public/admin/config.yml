@@ -182,3 +182,81 @@ collections:
           - { label: 替代文字, name: alt, widget: string, required: false }
           - { label: 说明, name: caption, widget: string, required: false }
       - { label: 正文, name: body, widget: markdown, required: false }
+
+  # ---------------- 学习日志 ----------------
+  # 落到 src/content/文章/学习日志/ → 自动被 /study/ 收录，分类也是「学习日志」
+  - name: study
+    label: 学习日志
+    label_singular: 一篇日志
+    folder: src/content/文章/学习日志
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    summary: "{{title}}"
+    sortable_fields: [published, title]
+    fields:
+      - { label: 标题, name: title, widget: string }
+      - label: 日期
+        name: published
+        widget: datetime
+        date_format: "YYYY-MM-DD"
+        time_format: false
+        picker_utc: true
+      - label: 摘要
+        name: description
+        widget: text
+        required: false
+      - label: 封面图
+        name: image
+        widget: image
+        required: false
+      - label: 标签
+        name: tags
+        widget: list
+        required: false
+        default: [学习日志]
+        hint: 默认带「学习日志」标签，留着就能被 /study/ 收录
+      - { label: 置顶, name: pinned, widget: boolean, default: false }
+      - { label: 私密（不公开）, name: private, widget: boolean, default: false }
+      - { label: 正文, name: body, widget: markdown }
+
+  # ---------------- 笔记 ----------------
+  # 落到 src/content/文章/笔记/ + downloadable: true → 出现在 /notes/ 且带下载按钮
+  - name: notes
+    label: 笔记
+    label_singular: 一篇笔记
+    folder: src/content/文章/笔记
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    slug: "{{slug}}"
+    summary: "{{title}}"
+    sortable_fields: [published, title]
+    fields:
+      - { label: 标题, name: title, widget: string }
+      - label: 日期
+        name: published
+        widget: datetime
+        date_format: "YYYY-MM-DD"
+        time_format: false
+        picker_utc: true
+      - label: 摘要
+        name: description
+        widget: text
+        required: false
+      - label: 标签
+        name: tags
+        widget: list
+        required: false
+        default: []
+      - label: 允许访客下载原文
+        name: downloadable
+        widget: boolean
+        default: true
+        hint: 必须在「笔记」集合里保持开启，否则不会出现在 /notes/ 页
+      - { label: 置顶, name: pinned, widget: boolean, default: false }
+      - { label: 私密（不公开）, name: private, widget: boolean, default: false }
+      - { label: 正文, name: body, widget: markdown }
