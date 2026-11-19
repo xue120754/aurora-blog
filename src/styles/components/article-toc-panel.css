@@ -16,7 +16,7 @@
 	display: none;
 }
 
-@media (min-width: 101rem) and (hover: hover) and (pointer: fine) {
+@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
 	.article-toc-panel {
 		--article-toc-active: #0e7490;
 		--article-toc-panel-bg: var(--page-bg);
@@ -1132,5 +1132,23 @@
 	.article-toc-mindmap__node {
 		transition-duration: 1ms;
 		transition-delay: 0ms;
+	}
+}
+
+/* ── 中屏兜底（1280–1615px）：目录贴右边缘，正文相应收窄，避免压住文字 ──
+   原作者只放行 ≥101rem（1616px），因为面板固定定位在正文右侧；
+   这里在更窄的区间改为贴右边缘 + 收窄正文宽度，让笔记本屏幕也能看到目录。 */
+@media (min-width: 80rem) and (max-width: 101rem) and (hover: hover) and (pointer: fine) {
+	.article-toc-panel {
+		left: auto;
+		right: 0.75rem;
+		--article-toc-surface-width: 15rem;
+	}
+}
+
+@media (min-width: 80rem) and (max-width: 101rem) {
+	/* 只影响带目录的文章页，不动首页与列表页 */
+	body:has(.article-toc-panel) {
+		--page-width: 46rem;
 	}
 }
