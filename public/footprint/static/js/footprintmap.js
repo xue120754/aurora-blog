@@ -217,8 +217,16 @@
                 const s = document.createElement('script');
                 s.src = `https://webapi.amap.com/maps?v=2.0&key=${this.apiKey}`;
                 // 安全密钥由页面在加载前注入，这里绝不能再覆盖（原来写成空字符串会导致 INVALID_USER_SCODE）
-                s.onload = () => { resolve(); };
-                s.onerror = reject;
+                s.onload = () => {
+                    // 高德在「域名未加入白名单」时会返回一段 JSON 而不是脚本，
+                    // onload 照样触发但 window.AMap 不存在，必须显式判断。
+                    if (window.AMap) { resolve(); return; }
+                    reject(new Error(
+                        '高德拒绝加载当前域名（' + location.hostname + '）。' +
+                        '请到高德控制台把该域名加入白名单，或把白名单留空（不限域名）。'
+                    ));
+                };
+                s.onerror = () => reject(new Error('高德地图脚本请求失败（可能被网络或插件拦截）'));
                 document.head.appendChild(s);
             });
         }
@@ -363,7 +371,7 @@
             await engine.load();
             renderUI(container, list, engine.init(list));
         } catch (e) {
-            container.innerHTML = `<div class="footprint-map__error">加载失败: ${e.message}</div>`;
+            const msg = (e && (e.message || e.type)) || String(e); container.innerHTML = `<div class="footprint-map__error">加载失败: ${msg}</div>`;
         } finally {
             container.classList.remove('footprint-map--loading');
         }
