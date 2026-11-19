@@ -504,6 +504,41 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 			let durationMs = 0;
 			let finished = false;
 
+			// ── 计时状态跨板块保持：挂在 window 上，Swup 换页时同一文档内不会丢失 ──
+			const FLOW_STATE_KEY = "__flowlightTimerState";
+			const saveFlowState = () => {
+				(window as unknown as Record<string, unknown>)[FLOW_STATE_KEY] = {
+					mode,
+					running,
+					accumulated,
+					runStartedAt,
+					durationMs,
+					finished,
+				};
+			};
+			const restoreFlowState = () => {
+				const saved = (window as unknown as Record<string, any>)[FLOW_STATE_KEY];
+				if (!saved || saved.mode === "clock") return;
+				mode = saved.mode as Mode;
+				running = !!saved.running;
+				accumulated = Number(saved.accumulated) || 0;
+				runStartedAt = Number(saved.runStartedAt) || 0;
+				durationMs = Number(saved.durationMs) || 0;
+				finished = !!saved.finished;
+				for (const button of modeButtons) {
+					button.classList.toggle("is-active", button.dataset.flowMode === mode);
+				}
+				if (finished) root.classList.add("is-finished");
+				startBtn.textContent = finished ? "重新开始" : running ? "暂停" : "继续";
+				statusEl.textContent = finished
+					? "时间到"
+					: running
+						? mode === "up"
+							? "正计时"
+							: "倒计时"
+						: "已暂停";
+			};
+
 			const readDuration = () => {
 				const clamp = (input: HTMLInputElement, max: number) => {
 					const value = Math.floor(Number(input.value) || 0);
@@ -528,6 +563,7 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 			};
 
 			const update = () => {
+				saveFlowState();
 				const now = performance.now();
 
 				if (mode === "clock") {
@@ -663,6 +699,7 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
 			// 100ms 刷新：保证时钟与正 / 倒计时显示及时更新
 			const tickId = window.setInterval(update, 100);
+			restoreFlowState();
 			update();
 
 			disposeFlowlight = () => {

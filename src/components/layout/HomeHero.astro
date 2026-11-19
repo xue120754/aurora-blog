@@ -238,7 +238,7 @@ const rainConfig = {
 						</div>
 						<div class="home-hero__status-badge" id="work-status">
 							<span class="home-hero__status-dot"></span>
-							<span class="home-hero__status-text">上班中</span>
+							<span class="home-hero__status-text">摸鱼中</span>
 						</div>
 					</div>
 
@@ -1439,7 +1439,7 @@ function collectRainEdges(hero: HTMLElement) {
 			if (nextAvatar && avatarEl.getAttribute("src") !== nextAvatar) {
 				avatarEl.setAttribute("src", nextAvatar);
 			}
-			statusTextEl.textContent = isWorking ? "上班中" : "下班";
+			statusTextEl.textContent = isWorking ? "摸鱼中" : "下班";
 			badgeEl.classList.toggle("is-off-work", !isWorking);
 
 			if (verticalStatus) {
@@ -1468,12 +1468,7 @@ function collectRainEdges(hero: HTMLElement) {
 			const root = document.querySelector<HTMLElement>(".home-hero__occupation");
 			const textEl = root?.querySelector<HTMLElement>("[data-typewriter-text]");
 			let fullText = root?.dataset.typewriter ?? "";
-			// 悬浮坞「首页文案」里保存过的自定义文案优先
-			try {
-				fullText = localStorage.getItem("heroOccupationText")?.trim() || fullText;
-			} catch {
-				// localStorage 不可用时沿用配置文案
-			}
+			// 首页文案固定使用配置里的默认值（访客不可修改）
 			if (!root || !textEl || !fullText) return;
 
 		destroyOccupationTypewriter();
