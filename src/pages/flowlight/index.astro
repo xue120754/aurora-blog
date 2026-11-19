@@ -190,13 +190,13 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
 		/* 亮色主题：一层可见的暖色底，让时钟卡从浅色壁纸上浮出来 */
 		html:not(.dark) .flow-clock {
-			border-color: rgba(224, 186, 158, 0.38);
+			border-color: rgba(150, 190, 225, 0.4);
 			background:
-				radial-gradient(circle at 50% 48%, rgba(255, 214, 186, 0.2), transparent 70%),
-				linear-gradient(145deg, rgba(255, 246, 238, 0.4), rgba(252, 238, 226, 0.3));
+				radial-gradient(circle at 50% 48%, rgba(196, 226, 250, 0.22), transparent 70%),
+				linear-gradient(145deg, rgba(243, 250, 255, 0.42), rgba(224, 241, 255, 0.32));
 			box-shadow:
-				inset 0 1px 0 rgba(255, 255, 255, 0.65),
-				0 18px 48px rgba(196, 150, 120, 0.14);
+				inset 0 1px 0 rgba(255, 255, 255, 0.7),
+				0 18px 48px rgba(118, 162, 204, 0.15);
 		}
 
 		.flow-clock__display {
@@ -243,13 +243,13 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
 		/* 亮色主题：换成偏淡偏暖的暖白晶体（奶油 / 浅陶土），与浅色壁纸同一色温 */
 		html:not(.dark) .flow-digit-pair {
-			background-color: #d9bcaa;
+			background-color: #cfe2f3;
 			background-image:
-				radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.95) 0 1px, transparent 1.8px),
-				radial-gradient(circle at 75% 60%, rgba(255, 232, 216, 0.85) 0 1px, transparent 2px),
-				linear-gradient(115deg, transparent 0 32%, rgba(255, 255, 255, 0.6) 33%, transparent 35% 63%, rgba(255, 255, 255, 0.3) 64%, transparent 66%),
-				linear-gradient(135deg, #a8836f 0%, #f7e6da 22%, #b99483 42%, #fff4ea 58%, #a07a67 78%, #e9cdbc 100%);
-			filter: drop-shadow(0 0.045em 0.032em rgba(140, 96, 74, 0.34)) drop-shadow(0 0 0.16em rgba(240, 190, 160, 0.3));
+				radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.96) 0 1px, transparent 1.8px),
+				radial-gradient(circle at 75% 60%, rgba(222, 240, 255, 0.9) 0 1px, transparent 2px),
+				linear-gradient(115deg, transparent 0 32%, rgba(255, 255, 255, 0.62) 33%, transparent 35% 63%, rgba(255, 255, 255, 0.32) 64%, transparent 66%),
+				linear-gradient(135deg, #8fb4d6 0%, #e8f4ff 22%, #a9c9e5 42%, #fbffff 58%, #8badd0 78%, #d2e8fa 100%);
+			filter: drop-shadow(0 0.045em 0.032em rgba(88, 128, 170, 0.34)) drop-shadow(0 0 0.16em rgba(168, 205, 240, 0.34));
 		}
 
 		/* 翻页钟的中缝：只保留一道细线，不分割成厚重卡片 */
