@@ -267,7 +267,15 @@ collections:
     label: 独立页面
     files:
 
-      - name: friends
+      - name: about
+        label: 关于我（文字）
+        file: src/data/about.json
+        format: json
+        fields:
+          - { label: 开头问候（前半句）, name: greetingPrefix, widget: string }
+          - { label: 开头问候（后半句）, name: greetingSuffix, widget: string }
+          - { label: 欢迎语, name: intro, widget: text }
+          - { label: 自我介绍, name: bio, widget: text }      - name: friends
         label: 友链页说明（friends.md）
         file: src/content/页面/friends.md
         fields:
