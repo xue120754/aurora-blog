@@ -1149,15 +1149,16 @@
 
 @media (min-width: 80rem) and (max-width: 101rem) {
 	/* 只影响带目录的文章页，不动首页与列表页 */
-	body:has(.article-toc-panel) {
-		--page-width: 40rem;
+	html body:has(.article-toc-panel) [class~="max-w-(--page-width)"] {
+		max-width: 40rem;
 	}
 }
-/* 只有「带右侧目录的文章页」需要收窄到 63rem；
-   其他页面（书架 / 记录 / 列表）保持站点全局的宽版布局。 */
+/* 只有「带右侧目录的文章页」需要收窄；
+   ⚠️ 不能改 --page-width 变量：它以内联 style 挂在 <html>/<body> 上，
+   内联优先级高于任何样式表规则，改了也不生效。直接约束宽度容器。 */
 @media (min-width: 80rem) {
-	body:has(.article-toc-panel) {
-		--page-width: 63rem;
+	body:has(.article-toc-panel) [class~="max-w-(--page-width)"] {
+		max-width: 63rem;
 	}
 }
 /* 右缘兜底：任何宽度下目录面板都不越出视口右边界 */
