@@ -1,18 +1,12 @@
 ---
-title: C++算法竞赛笔记基础知识
+title: C++ 语法与算法竞赛笔记
 published: 2026-11-20
-updated: 2026-11-20
-description: 一些以前用C++做的算法竞赛笔记，可能会更新，也可能不会，因为现在换python写算法题了，python的笔记会持续更新，涵盖蓝桥杯B组大部分算法知识点的
-image: /assets/images/covers/41.webp
-tags:
-  - 算法   C++
-pinned: false
-draft: false
-private: false
+description: C++ 语法要点与算法竞赛基础知识（含 18 张配图）
+tags: [C++, 算法, 笔记, 竞赛]
 downloadable: true
-lang: ""
 ---
-模板**
+
+**模板**
 
 ```c++
 #include <bits/stdc++.h>
@@ -935,7 +929,7 @@ signed main() {
 
 https://ac.nowcoder.com/acm/contest/130222/E
 
-![image-20260329160141859](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260329160141859.png)
+![image-20260329160141859](/assets/images/posts/cpp-algo/img-01.png)
 
 代码：
 
@@ -1091,7 +1085,7 @@ int main(){
 
 ## 无序集合unordered_set
 
-![image-20260612163859565](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260612163859565.png)
+![image-20260612163859565](/assets/images/posts/cpp-algo/img-02.png)
 
 ```c++
 unordered_set<int> s;
@@ -1221,7 +1215,6 @@ for(int i=l;i<r;i++){//遍历输出3个
 return 0;
 }
 ```
-
 #### 降序版
 
 
@@ -1242,7 +1235,6 @@ for(int i=l;i<r;i++){//遍历从大到小输出3个
 return 0;
 }
 ```
-
 #### 改编版
 
 
@@ -1582,7 +1574,7 @@ int main() {
 
 [B-小红的冷门副本_牛客周赛 Round 143](https://ac.nowcoder.com/acm/contest/134529/B)
 
-![image-20260612161806809](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260612161806809.png)
+![image-20260612161806809](/assets/images/posts/cpp-algo/img-03.png)
 
 ```c++
 //map 是什么
@@ -1697,8 +1689,6 @@ int main() {
 
 [^非常牛逼的思路]: O（1）,把减去等效加上的原数据统计；见下图
 
-![](C:\Users\xue\Desktop\微信图片_20260527005617_52_2.jpg)
-
 ```c++
 #include <iostream>
 #include <vector>
@@ -1808,8 +1798,6 @@ int main() {
 
 
 ## 数学函数
-
-![](C:\Users\xue\Pictures\Screenshots\屏幕截图 2026-03-13 163438.png)
 
 #### 1. 向上取整：`ceil(x)`
 
@@ -2414,7 +2402,7 @@ void Aiden()
 
 那么，这种情况之下， *dp* 的状态转移方程应当如下：
 
-![image-20261105195007510](c++语法算法知识点.assets/image-20261105195007510.png)
+![image-20261105195007510](/assets/images/posts/cpp-algo/img-04.png)
 
 但是实测的话却会出问题，这是为什么呢？
 
@@ -2430,7 +2418,7 @@ void Aiden()
 
 这一次，我们在 *dp* 数组里存储以这个数为结尾的最大子段和，那么状态转移方程如下：
 
-![image-20261105195029014](c++语法算法知识点.assets/image-20261105195029014.png)
+![image-20261105195029014](/assets/images/posts/cpp-algo/img-05.png)
 
 那么最终的答案就是 *dp* 存储的数中最大的那一个。
 
@@ -2643,9 +2631,9 @@ d[r + 1] -= 1
 - `d[l] += 1`：从 `l` 开始，覆盖次数增加；
 - `d[r + 1] -= 1`：从 `r + 1` 开始，覆盖次数取消。
 
-![image-20261020211132975](c++语法算法知识点.assets/image-20261020211132975.png)
+![image-20261020211132975](/assets/images/posts/cpp-algo/img-06.png)
 
-![image-20261020211212265](c++语法算法知识点.assets/image-20261020211212265.png)
+![image-20261020211212265](/assets/images/posts/cpp-algo/img-07.png)
 
 前缀和
 
@@ -2660,7 +2648,7 @@ for i in range(len(x)):
     s[i] = now
 ```
 
-![image-20261020211620781](c++语法算法知识点.assets/image-20261020211620781.png)
+![image-20261020211620781](/assets/images/posts/cpp-algo/img-08.png)
 
 
 
@@ -2884,7 +2872,7 @@ while(q--)
 }
 ```
 
-![image-20261108153216863](c++语法算法知识点.assets/image-20261108153216863.png)
+![image-20261108153216863](/assets/images/posts/cpp-algo/img-09.png)
 
 ## 例题
 
@@ -3986,7 +3974,7 @@ void Aiden()
 
 # *7*二分查找
 
-![image-20261025114853931](c++语法算法知识点.assets/image-20261025114853931-1793776005585-1.png)
+![image-20261025114853931](/assets/images/posts/cpp-algo/img-10.png)
 
 ```c++
 答疑
@@ -4449,7 +4437,7 @@ int main(){
 
 https://www.luogu.com.cn/problem/P1706
 
-![](C:\Users\xue\Downloads\a24be261e1b65eb9975578905f0ca165~tplv-be4g95zd3a-image.jpeg)
+![](/assets/images/posts/cpp-algo/img-11.jpeg)
 
 ```c++
 #include<iostream>
@@ -4590,7 +4578,7 @@ int main() {
 
 [P1157 组合的输出 - 洛谷](https://www.luogu.com.cn/problem/P1157)
 
-![image-20260401183009514](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260401183009514.png)
+![image-20260401183009514](/assets/images/posts/cpp-algo/img-12.png)
 
 ```c++
 #include<bits/stdc++.h>
@@ -4623,7 +4611,7 @@ int main(){
 
 异或
 
-![image-20261025094340062](c++语法算法知识点.assets/image-20261025094340062.png)
+![image-20261025094340062](/assets/images/posts/cpp-algo/img-13.png)
 
 下面用 Python 讲解图片中的三种基础位运算：`&`、`|`、`^`
 
@@ -4861,7 +4849,7 @@ Plain text
 
 [M-小苯的异或疑惑（hard）_北京信息科技大学第十五届程序设计竞赛（同步赛）](https://ac.nowcoder.com/acm/contest/68572/M)
 
-![image-20261025104919306](c++语法算法知识点.assets/image-20261025104919306.png)
+![image-20261025104919306](/assets/images/posts/cpp-algo/img-14.png)
 
 ```python
 import sys
@@ -5077,11 +5065,11 @@ N >> 1 即 N / 2，所以数组 b 的大小约为 50 万（1000011 / 2 = 500005�
 
 >
 
-![image-20260410164237025](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260410164237025.png)
+![image-20260410164237025](/assets/images/posts/cpp-algo/img-15.png)
 
-![image-20260521221850112](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260521221850112.png)
+![image-20260521221850112](/assets/images/posts/cpp-algo/img-16.png)
 
-![image-20260528004159366](C:\Users\xue\AppData\Roaming\Typora\typora-user-images\image-20260528004159366.png)
+![image-20260528004159366](/assets/images/posts/cpp-algo/img-17.png)
 
 低 t 位相同” 等价于 “模 k 相同”
 
@@ -5208,4 +5196,99 @@ mask |= (1<<1)
 5 >> 1 → 0000 0010 → 2   等价 5 / 2
 5 >> 2 → 0000 0001 → 1   等价 5 / 4
 ```
+
+
+
+# 10大整数乘法：__int128
+
+[L-A × B_河南萌新联赛2026第（四）场：南阳理工学院](https://ac.nowcoder.com/acm/contest/139235/L)
+
+`__int128`可以保存到\(10^{38}\)，足够存\(10^{18}*10^{18}\)。
+
+注意：cin/cout/printf**不支持直接打印__int128**，需要手写输出函数
+
+```c++
+#include <iostream>
+using namespace std;
+
+// 输出__int128
+void print(__int128 x)
+{
+    if(x > 9) print(x / 10);
+    putchar(x % 10 + '0');
+}
+
+int main()
+{
+    long long a, b;
+    scanf("%lld %lld", &a, &b);
+    __int128 res = (__int128)a * b;
+    print(res);
+    return 0;
+}
+```
+
+# 11进制转换
+
+`re[i] = pre[i] - □ × 10 + s[i]`，这个是**进制转换（字符串转数字）**的递推式！
+
+把**字符串形式的 b 进制数字**，转成十进制整数：
+
+```c++
+res = res × base + (当前位数字)
+```
+
+举例子：字符串 `s = "123"`，base=10（十进制）
+
+1. res 初始 = 0
+2. 第一位`'1'`：`res = 0 * 10 + 1 = 1`
+3. 第二位`'2'`：`res = 1 * 10 + 2 = 12`
+4. 第三位`'3'`：`res = 12 * 10 + 3 = 123`
+
+```c++
+string s = "123";
+long long res = 0;
+for(char ch : s){
+    int digit = ch - '0'; //字符转数字
+    res = res * 10 + digit;
+}
+cout << res;
+```
+
+## 区分两个公式（很容易搞混）
+
+1. **前缀和**：`pre[i] = pre[i-1] + a[i]` （求数组区间和）
+2. **字符串转数字（进制转换递推）**：`res = res * base + digit`（你手写的这个）
+
+# 字符串哈希算法
+
+![image-20260917162827294](/assets/images/posts/cpp-algo/img-18.png)
+
+多项式字符串哈希前缀：\(\boldsymbol{Pre[r] - Pre[l-1] \times base^{r-l+1}}\)
+
+
+
+\(\boldsymbol{Hash(l,r) = Pre[r] - Pre[l-1] \times 10^{r-l+1}}\)
+
+
+
+字符串：`1 3 5 7`，取 \(l=2,r=4\)
+
+子串：`3 5 7`，值 = 357
+
+- \(Pre[4]=1357\)
+- \(Pre[l-1]=Pre[1]=1\)
+- \(r-l+1 = 4-2+1=3\)，\(10^3=1000\)
+
+\(Hash(2,4)=Pre[4]-Pre[1]\times10^{3}=1357 - 1\times 1000 = 357\)
+
+和子串`357`完全一致。
+
+
+
+## `s = " " + s;` 解析（字符串哈希经典写法）
+
+> 这行代码的目的：**把字符串下标从 1 开始，而不是 C++ 默认的 0 下标**
+
+
 
