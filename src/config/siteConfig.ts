@@ -36,7 +36,7 @@ export const siteConfig: SiteConfig = {
 
 	// 页面整体宽度（单位：rem）
 	// 数值越大可以让页面内容区域更宽
-	pageWidth: 100,
+	pageWidth: 63,
 
 	// 网站Card样式配置
 	card: {
