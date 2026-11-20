@@ -1153,6 +1153,13 @@
 		--page-width: 40rem;
 	}
 }
+/* 只有「带右侧目录的文章页」需要收窄到 63rem；
+   其他页面（书架 / 记录 / 列表）保持站点全局的宽版布局。 */
+@media (min-width: 80rem) {
+	body:has(.article-toc-panel) {
+		--page-width: 63rem;
+	}
+}
 /* 右缘兜底：任何宽度下目录面板都不越出视口右边界 */
 @media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
 	.article-toc-panel {
