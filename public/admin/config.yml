@@ -260,3 +260,31 @@ collections:
       - { label: 置顶, name: pinned, widget: boolean, default: false }
       - { label: 私密（不公开）, name: private, widget: boolean, default: false }
       - { label: 正文, name: body, widget: markdown }
+
+  # ---------------- 独立页面 ----------------
+  # files 方式：每个页面单独声明，避免 .md/.mdx 混排时被当成同一模板
+  - name: pages
+    label: 独立页面
+    files:
+      - name: about
+        label: 关于我（about.mdx）
+        file: src/content/页面/about.mdx
+        fields:
+          - label: 正文
+            name: body
+            widget: markdown
+            hint: ⚠️ 这段文字里夹着组件代码（<AboutProfileCard .../> 等 import 与自闭合标签），只改纯文字部分，不要动尖括号里的内容
+      - name: friends
+        label: 友链页说明（friends.md）
+        file: src/content/页面/friends.md
+        fields:
+          - { label: 标题, name: title, widget: string, required: false }
+          - { label: 描述, name: description, widget: text, required: false }
+          - { label: 正文, name: body, widget: markdown, required: false }
+      - name: guestbook
+        label: 留言板说明（guestbook.md）
+        file: src/content/页面/guestbook.md
+        fields:
+          - { label: 标题, name: title, widget: string, required: false }
+          - { label: 描述, name: description, widget: text, required: false }
+          - { label: 正文, name: body, widget: markdown, required: false }
