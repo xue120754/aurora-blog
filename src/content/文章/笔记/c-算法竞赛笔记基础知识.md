@@ -9,7 +9,7 @@ tags:
 pinned: false
 draft: false
 private: false
-downloadable: false
+downloadable: true
 lang: ""
 ---
 模板**
