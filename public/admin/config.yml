@@ -266,14 +266,7 @@ collections:
   - name: pages
     label: 独立页面
     files:
-      - name: about
-        label: 关于我（about.mdx）
-        file: src/content/页面/about.mdx
-        fields:
-          - label: 正文
-            name: body
-            widget: markdown
-            hint: ⚠️ 这段文字里夹着组件代码（<AboutProfileCard .../> 等 import 与自闭合标签），只改纯文字部分，不要动尖括号里的内容
+
       - name: friends
         label: 友链页说明（friends.md）
         file: src/content/页面/friends.md
