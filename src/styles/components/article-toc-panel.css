@@ -34,7 +34,8 @@
 		position: fixed;
 		top: 8rem;
 		/* 与旧轨道同位：正文卡宽 63rem（半宽 31.5rem），贴右缘再留 1rem 间距 */
-		left: calc(50% + 36rem + 3rem);
+		left: auto;
+		right: 1.25rem;
 		z-index: 30;
 		display: block;
 		width: var(--article-toc-surface-width);
@@ -1135,35 +1136,24 @@
 	}
 }
 
-
-/* ── 中屏兜底（1280–1615px）：目录贴右边缘，正文相应收窄，避免压住文字 ──
-   原作者只放行 ≥101rem（1616px），因为面板固定定位在正文右侧；
-   这里在更窄的区间改为贴右边缘 + 收窄正文宽度，让笔记本屏幕也能看到目录。 */
-@media (min-width: 80rem) and (max-width: 101rem) and (hover: hover) and (pointer: fine) {
+/* ── 目录面板定位：始终贴屏幕右边缘 ──
+   原设计按「正文半宽 + 间距」推算，正文一变宽就会跑出视口；
+   改贴右边缘后，正文宽度可以自由伸缩，两者永不重叠。 */
+@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
 	.article-toc-panel {
 		left: auto;
 		right: 1.25rem;
-		--article-toc-surface-width: 13rem;
+		--article-toc-surface-width: 16rem;
 	}
 }
 
-@media (min-width: 80rem) and (max-width: 101rem) {
-	/* 只影响带目录的文章页，不动首页与列表页 */
-	html body:has(.article-toc-panel) [class~="max-w-(--page-width)"] {
-		max-width: 40rem;
-	}
-}
-/* 只有「带右侧目录的文章页」需要收窄；
+/* ── 带目录的文章页：正文宽度自适应 ──
+   min(上限 72rem, 视口宽 - 40rem)：视口越大正文越宽，
+   40rem 的空间留给右侧目录（16rem）+ 两侧边距 + 安全间隙。
    ⚠️ 不能改 --page-width 变量：它以内联 style 挂在 <html>/<body> 上，
-   内联优先级高于任何样式表规则，改了也不生效。直接约束宽度容器。 */
+   内联优先级高于样式表，改了不生效，只能约束宽度容器。 */
 @media (min-width: 80rem) {
 	body:has(.article-toc-panel) [class~="max-w-(--page-width)"] {
-		max-width: 72rem;
-	}
-}
-/* 右缘兜底：任何宽度下目录面板都不越出视口右边界 */
-@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
-	.article-toc-panel {
-		left: min(calc(50% + 36rem + 3rem), calc(100% - var(--article-toc-surface-width) - 1.25rem));
+		max-width: min(72rem, calc(100vw - 40rem));
 	}
 }
