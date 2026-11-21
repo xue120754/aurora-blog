@@ -1,0 +1,98 @@
+---
+// 临时诊断页：显示当前视口尺寸与文章页正文实际渲染宽度
+// 用完可删除（src/pages/debug-layout.astro）
+const sampleUrl = "/posts/生活随笔/从今天开始/";
+---
+
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="robots" content="noindex" />
+		<title>布局诊断</title>
+		<style>
+			body {
+				margin: 0;
+				padding: 24px;
+				font: 15px/1.7 ui-monospace, Consolas, monospace;
+				background: #0f1115;
+				color: #e6e8ec;
+			}
+			h1 {
+				font-size: 18px;
+				margin: 0 0 16px;
+			}
+			table {
+				border-collapse: collapse;
+				margin-bottom: 20px;
+			}
+			td {
+				padding: 6px 18px 6px 0;
+				border-bottom: 1px solid #262b33;
+			}
+			td:first-child {
+				color: #8b95a5;
+			}
+			td:last-child {
+				font-weight: 700;
+				color: #7ee0c0;
+			}
+			iframe {
+				width: 100%;
+				height: 320px;
+				border: 1px solid #262b33;
+				border-radius: 8px;
+				background: #fff;
+			}
+			.note {
+				color: #8b95a5;
+				font-size: 13px;
+				margin: 8px 0 16px;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>布局诊断</h1>
+		<table id="out">
+			<tr><td>视口宽度 innerWidth</td><td id="iw">…</td></tr>
+			<tr><td>设备像素比 devicePixelRatio</td><td id="dpr">…</td></tr>
+			<tr><td>可视宽度 clientWidth</td><td id="cw">…</td></tr>
+			<tr><td>实际缩放 (物理/逻辑)</td><td id="zoom">…</td></tr>
+			<tr><td>文章页 #content-wrapper 宽度</td><td id="cwid">…</td></tr>
+			<tr><td>文章页 #post-container 宽度</td><td id="pc">…</td></tr>
+		</table>
+		<p class="note">下面这个框加载的是文章页，用它的真实布局来测量。</p>
+		<iframe id="frame" src={sampleUrl}></iframe>
+
+		<script is:inline>
+			(function () {
+				var iw = window.innerWidth;
+				var dpr = window.devicePixelRatio || 1;
+				document.getElementById("iw").textContent = iw + " px";
+				document.getElementById("dpr").textContent = String(dpr);
+				document.getElementById("cw").textContent = document.documentElement.clientWidth + " px";
+				document.getElementById("zoom").textContent = (
+					Math.round((window.outerWidth / iw) * 100) / 100
+				).toFixed(2);
+
+				var frame = document.getElementById("frame");
+				frame.addEventListener("load", function () {
+					try {
+						var d = frame.contentDocument;
+						var cw = d.getElementById("content-wrapper");
+						var pc = d.getElementById("post-container");
+						document.getElementById("cwid").textContent = cw
+							? Math.round(cw.getBoundingClientRect().width) + " px"
+							: "未找到";
+						document.getElementById("pc").textContent = pc
+							? Math.round(pc.getBoundingClientRect().width) + " px"
+							: "未找到";
+					} catch (e) {
+						document.getElementById("cwid").textContent = "读取失败";
+						document.getElementById("pc").textContent = "读取失败";
+					}
+				});
+			})();
+		</script>
+	</body>
+</html>
