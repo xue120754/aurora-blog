@@ -16,7 +16,7 @@
 	display: none;
 }
 
-@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
+@media (min-width: 101rem) and (hover: hover) and (pointer: fine) {
 	.article-toc-panel {
 		--article-toc-active: #0e7490;
 		--article-toc-panel-bg: var(--page-bg);
@@ -34,8 +34,7 @@
 		position: fixed;
 		top: 8rem;
 		/* 与旧轨道同位：正文卡宽 63rem（半宽 31.5rem），贴右缘再留 1rem 间距 */
-		left: auto;
-		right: 1.25rem;
+		left: calc(50% + 31.5rem + var(--space-4));
 		z-index: 30;
 		display: block;
 		width: var(--article-toc-surface-width);
@@ -1133,27 +1132,5 @@
 	.article-toc-mindmap__node {
 		transition-duration: 1ms;
 		transition-delay: 0ms;
-	}
-}
-
-/* ── 目录面板定位：始终贴屏幕右边缘 ──
-   原设计按「正文半宽 + 间距」推算，正文一变宽就会跑出视口；
-   改贴右边缘后，正文宽度可以自由伸缩，两者永不重叠。 */
-@media (min-width: 80rem) and (hover: hover) and (pointer: fine) {
-	.article-toc-panel {
-		left: auto;
-		right: 1.25rem;
-		--article-toc-surface-width: 16rem;
-	}
-}
-
-/* ── 带目录的文章页：正文宽度自适应 ──
-   min(上限 72rem, 视口宽 - 40rem)：视口越大正文越宽，
-   40rem 的空间留给右侧目录（16rem）+ 两侧边距 + 安全间隙。
-   ⚠️ 不能改 --page-width 变量：它以内联 style 挂在 <html>/<body> 上，
-   内联优先级高于样式表，改了不生效，只能约束宽度容器。 */
-@media (min-width: 80rem) {
-	body:has(.article-toc-panel) [class~="max-w-(--page-width)"] {
-		max-width: min(72rem, calc(100vw - 40rem));
 	}
 }
