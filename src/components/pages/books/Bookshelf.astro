@@ -299,7 +299,7 @@ const statusMap: Record<number, string> = {
 	}
 
 	function initBookshelf() {
-		const root = document.querySelector<HTMLElement>("[data-bookshelf]");
+		const root = document.querySelector<HTMLElement>("[data-bookshelf]")!;
 		if (!root) {
 			dispose?.();
 			dispose = null;
@@ -313,26 +313,26 @@ const statusMap: Record<number, string> = {
 
 		const defaultCover =
 			root.dataset.booksDefaultCover || "/assets/images/covers/1.webp";
-		const tabNav = root.querySelector<HTMLElement>("[data-books-tab-nav]");
-		const statusNav = root.querySelector<HTMLElement>("[data-books-status-nav]");
-		const grid = root.querySelector<HTMLElement>("[data-books-grid]");
-		const emptyHint = root.querySelector<HTMLElement>("[data-books-empty]");
-		const toastEl = root.querySelector<HTMLElement>("[data-books-toast]");
-		const modal = root.querySelector<HTMLElement>("[data-books-modal]");
-		const form = root.querySelector<HTMLFormElement>("[data-books-form]");
-		const addBtn = document.getElementById("books-add-btn");
+		const tabNav = root.querySelector<HTMLElement>("[data-books-tab-nav]")!;
+		const statusNav = root.querySelector<HTMLElement>("[data-books-status-nav]")!;
+		const grid = root.querySelector<HTMLElement>("[data-books-grid]")!;
+		const emptyHint = root.querySelector<HTMLElement>("[data-books-empty]")!;
+		const toastEl = root.querySelector<HTMLElement>("[data-books-toast]")!;
+		const modal = root.querySelector<HTMLElement>("[data-books-modal]")!;
+		const form = root.querySelector<HTMLFormElement>("[data-books-form]")!;
+		const addBtn = document.getElementById("books-add-btn")!;
 
-		const titleInput = root.querySelector<HTMLInputElement>("[data-books-form-title]");
-		const coverInput = root.querySelector<HTMLInputElement>("[data-books-form-cover]");
-		const coverBtn = root.querySelector<HTMLButtonElement>("[data-books-cover-btn]");
-		const coverClear = root.querySelector<HTMLButtonElement>("[data-books-cover-clear]");
-		const coverPreview = root.querySelector<HTMLImageElement>("[data-books-cover-preview]");
-		const coverName = root.querySelector<HTMLElement>("[data-books-cover-name]");
-		const linkInput = root.querySelector<HTMLInputElement>("[data-books-form-link]");
-		const statusSelect = root.querySelector<HTMLSelectElement>("[data-books-form-status]");
-		const scoreInput = root.querySelector<HTMLInputElement>("[data-books-form-score]");
-		const categoryInput = root.querySelector<HTMLInputElement>("[data-books-form-category]");
-		const errorEl = root.querySelector<HTMLElement>("[data-books-form-error]");
+		const titleInput = root.querySelector<HTMLInputElement>("[data-books-form-title]")!;
+		const coverInput = root.querySelector<HTMLInputElement>("[data-books-form-cover]")!;
+		const coverBtn = root.querySelector<HTMLButtonElement>("[data-books-cover-btn]")!;
+		const coverClear = root.querySelector<HTMLButtonElement>("[data-books-cover-clear]")!;
+		const coverPreview = root.querySelector<HTMLImageElement>("[data-books-cover-preview]")!;
+		const coverName = root.querySelector<HTMLElement>("[data-books-cover-name]")!;
+		const linkInput = root.querySelector<HTMLInputElement>("[data-books-form-link]")!;
+		const statusSelect = root.querySelector<HTMLSelectElement>("[data-books-form-status]")!;
+		const scoreInput = root.querySelector<HTMLInputElement>("[data-books-form-score]")!;
+		const categoryInput = root.querySelector<HTMLInputElement>("[data-books-form-category]")!;
+		const errorEl = root.querySelector<HTMLElement>("[data-books-form-error]")!;
 
 		if (
 			!tabNav ||
@@ -450,14 +450,14 @@ const statusMap: Record<number, string> = {
 		}
 
 		function initIndicators() {
-			const catIndicator = tabNav.querySelector<HTMLElement>("[data-books-tab-indicator]");
-			const catActive = tabNav.querySelector<HTMLElement>(".tools-tab-btn-active");
+			const catIndicator = tabNav.querySelector<HTMLElement>("[data-books-tab-indicator]")!;
+			const catActive = tabNav.querySelector<HTMLElement>(".tools-tab-btn-active")!;
 			if (catIndicator && catActive) updateIndicator(catIndicator, catActive);
 
 			const statusIndicator = statusNav.querySelector<HTMLElement>(
 				"[data-books-status-indicator]",
-			);
-			const statusActive = statusNav.querySelector<HTMLElement>(".tools-tab-btn-active");
+			)!;
+			const statusActive = statusNav.querySelector<HTMLElement>(".tools-tab-btn-active")!;
 			if (statusIndicator && statusActive) updateIndicator(statusIndicator, statusActive);
 		}
 
@@ -472,7 +472,7 @@ const statusMap: Record<number, string> = {
 		function syncPaginationVisibility() {
 			const pagination = root.querySelector<HTMLElement>(
 				"[data-pagination-section='books']",
-			);
+			)!;
 			if (!pagination) return;
 			const total = root.querySelectorAll("[data-item-section='books']").length;
 			pagination.style.display = total > 0 ? "" : "none";
@@ -501,7 +501,7 @@ const statusMap: Record<number, string> = {
 
 			const pagination = root.querySelector<HTMLElement>(
 				"[data-pagination-section='books']",
-			);
+			)!;
 			if (pagination) {
 				pagination.dispatchEvent(
 					new CustomEvent("updatePagination", {
@@ -515,7 +515,7 @@ const statusMap: Record<number, string> = {
 		function createCard(book: ManualBook): HTMLElement | null {
 			const template = root.querySelector<HTMLTemplateElement>(
 				"[data-books-card-template]",
-			);
+			)!;
 			const card = template?.content.firstElementChild?.cloneNode(true) as
 				| HTMLElement
 				| undefined;
@@ -531,7 +531,7 @@ const statusMap: Record<number, string> = {
 			card.dataset.booksItemCat = book.category;
 			card.dataset.booksItemStatus = meta.value;
 
-			const anchor = card.querySelector<HTMLAnchorElement>("a.nb-book");
+			const anchor = card.querySelector<HTMLAnchorElement>("a.nb-book")!;
 			if (anchor) {
 				anchor.title = book.title;
 				if (book.link && book.link !== "#") {
@@ -544,7 +544,7 @@ const statusMap: Record<number, string> = {
 
 			const img = card.querySelector<HTMLImageElement>(
 				".nb-book-illustration-img",
-			);
+			)!;
 			if (img) {
 				img.alt = book.title;
 				if (book.cover) {
@@ -556,16 +556,16 @@ const statusMap: Record<number, string> = {
 				}
 			}
 
-			const statusTag = card.querySelector<HTMLElement>(".book-status-tag");
+			const statusTag = card.querySelector<HTMLElement>(".book-status-tag")!;
 			if (statusTag) {
 				statusTag.textContent = meta.label;
 				statusTag.style.background = meta.color;
 			}
 
-			const scoreTag = card.querySelector<HTMLElement>(".book-score-tag");
+			const scoreTag = card.querySelector<HTMLElement>(".book-score-tag")!;
 			if (scoreTag) {
 				if (book.score > 0) {
-					const star = scoreTag.querySelector("svg");
+					const star = scoreTag.querySelector("svg")!;
 					scoreTag.replaceChildren();
 					if (star) scoreTag.appendChild(star);
 					scoreTag.appendChild(
@@ -594,7 +594,7 @@ const statusMap: Record<number, string> = {
 		}
 
 		function rebuildCategoryTabs() {
-			const active = tabNav.querySelector<HTMLElement>(".tools-tab-btn-active");
+			const active = tabNav.querySelector<HTMLElement>(".tools-tab-btn-active")!;
 			const activeCat = active?.dataset.booksTab || "all";
 
 			tabNav
@@ -608,7 +608,7 @@ const statusMap: Record<number, string> = {
 			);
 			const template = root.querySelector<HTMLTemplateElement>(
 				"[data-books-category-template]",
-			);
+			)!;
 			const manualCategories = [...new Set(books.map((book) => book.category))];
 
 			for (const category of manualCategories) {
@@ -619,17 +619,17 @@ const statusMap: Record<number, string> = {
 				if (!btn) continue;
 				btn.dataset.booksTab = category;
 				btn.dataset.manualTab = "1";
-				const label = btn.querySelector<HTMLElement>("[data-manual-tab-label]");
+				const label = btn.querySelector<HTMLElement>("[data-manual-tab-label]")!;
 				if (label) label.textContent = category;
 				tabNav.appendChild(btn);
 				existing.add(category);
 			}
 
 			if (activeCat !== "all" && !existing.has(activeCat)) {
-				const allBtn = tabNav.querySelector<HTMLElement>('[data-books-tab="all"]');
+				const allBtn = tabNav.querySelector<HTMLElement>('[data-books-tab="all"]')!;
 				const indicator = tabNav.querySelector<HTMLElement>(
 					"[data-books-tab-indicator]",
-				);
+				)!;
 				if (allBtn) {
 					activateBtn(
 						Array.from(
@@ -661,7 +661,7 @@ const statusMap: Record<number, string> = {
 						value === "all"
 							? manualTotal
 							: books.filter((book) => book.category === value).length;
-					const badge = btn.querySelector<HTMLElement>(".tools-tab-badge");
+					const badge = btn.querySelector<HTMLElement>(".tools-tab-badge")!;
 					if (badge) badge.textContent = String(staticCount + manualCount);
 				});
 
@@ -681,7 +681,7 @@ const statusMap: Record<number, string> = {
 							: books.filter(
 									(book) => STATUS_META[book.status]?.value === value,
 								).length;
-					const badge = btn.querySelector<HTMLElement>(".tools-tab-badge");
+					const badge = btn.querySelector<HTMLElement>(".tools-tab-badge")!;
 					if (badge) badge.textContent = String(staticCount + manualCount);
 				});
 
@@ -699,7 +699,7 @@ const statusMap: Record<number, string> = {
 			for (const [key, value] of Object.entries(stats)) {
 				const el = document.querySelector<HTMLElement>(
 					`[data-books-stat="${key}"]`,
-				);
+				)!;
 				if (el) el.textContent = String(value);
 			}
 		}

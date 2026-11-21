@@ -318,7 +318,7 @@ const publicLogs = import.meta.env.DEV
 		}
 
 		function initStudyPage() {
-			const page = document.getElementById("study-page");
+			const page = document.getElementById("study-page")!;
 			if (!page) {
 				dispose?.();
 				dispose = null;
@@ -332,53 +332,53 @@ const publicLogs = import.meta.env.DEV
 			const abort = new AbortController();
 			const { signal } = abort;
 
-			const listEl = document.getElementById("study-list");
-			const countEl = document.getElementById("study-count");
-			const sideEmpty = document.getElementById("study-side-empty");
+			const listEl = document.getElementById("study-list")!;
+			const countEl = document.getElementById("study-count")!;
+			const sideEmpty = document.getElementById("study-side-empty")!;
 			const searchInput = document.getElementById(
 				"study-search",
-			) as HTMLInputElement | null;
-			const newBtn = document.getElementById("study-new-btn");
-			const listView = document.getElementById("study-list-view");
-			const studyMain = document.getElementById("study-main");
-			const backBtn = document.getElementById("study-back-btn");
-			const editorEl = document.getElementById("study-editor");
+			) as HTMLInputElement;
+			const newBtn = document.getElementById("study-new-btn")!;
+			const listView = document.getElementById("study-list-view")!;
+			const studyMain = document.getElementById("study-main")!;
+			const backBtn = document.getElementById("study-back-btn")!;
+			const editorEl = document.getElementById("study-editor")!;
 			const titleInput = document.getElementById(
 				"study-editor-title",
-			) as HTMLInputElement | null;
+			) as HTMLInputElement;
 			const contentInput = document.getElementById(
 				"study-editor-content",
-			) as HTMLTextAreaElement | null;
+			) as HTMLTextAreaElement;
 			const summaryInput = document.getElementById(
 				"study-editor-summary",
-			) as HTMLTextAreaElement | null;
+			) as HTMLTextAreaElement;
 			const imageInput = document.getElementById(
 				"study-image-input",
-			) as HTMLInputElement | null;
-			const imageBtn = document.getElementById("study-image-btn");
-			const pendingEl = document.getElementById("study-pending");
-			const editorSave = document.getElementById("study-editor-save");
-			const editorCancel = document.getElementById("study-editor-cancel");
-			const docEl = document.getElementById("study-doc");
-			const docTitle = document.getElementById("study-doc-title");
-			const docDate = document.getElementById("study-doc-date");
-			const contentEl = document.getElementById("study-content");
-			const summaryEl = document.getElementById("study-summary");
-			const imagesSection = document.getElementById("study-images-section");
-			const imagesEl = document.getElementById("study-images");
-			const editBtn = document.getElementById("study-edit-btn");
-			const exportBtn = document.getElementById("study-export-btn");
-			const deleteBtn = document.getElementById("study-delete-btn");
-			const coverSection = document.getElementById("study-cover");
+			) as HTMLInputElement;
+			const imageBtn = document.getElementById("study-image-btn")!;
+			const pendingEl = document.getElementById("study-pending")!;
+			const editorSave = document.getElementById("study-editor-save")!;
+			const editorCancel = document.getElementById("study-editor-cancel")!;
+			const docEl = document.getElementById("study-doc")!;
+			const docTitle = document.getElementById("study-doc-title")!;
+			const docDate = document.getElementById("study-doc-date")!;
+			const contentEl = document.getElementById("study-content")!;
+			const summaryEl = document.getElementById("study-summary")!;
+			const imagesSection = document.getElementById("study-images-section")!;
+			const imagesEl = document.getElementById("study-images")!;
+			const editBtn = document.getElementById("study-edit-btn")!;
+			const exportBtn = document.getElementById("study-export-btn")!;
+			const deleteBtn = document.getElementById("study-delete-btn")!;
+			const coverSection = document.getElementById("study-cover")!;
 			const coverImg = document.getElementById(
 				"study-cover-img",
 			) as HTMLImageElement | null;
-			const coverBtn = document.getElementById("study-cover-btn");
+			const coverBtn = document.getElementById("study-cover-btn")!;
 			const coverInput = document.getElementById(
 				"study-cover-input",
-			) as HTMLInputElement | null;
-			const removeCoverBtn = document.getElementById("study-remove-cover");
-			const toastEl = document.getElementById("study-toast");
+			) as HTMLInputElement;
+			const removeCoverBtn = document.getElementById("study-remove-cover")!;
+			const toastEl = document.getElementById("study-toast")!;
 
 			if (
 				!listEl ||
@@ -876,7 +876,7 @@ const publicLogs = import.meta.env.DEV
 				);
 				renderList();
 				if (!docEl.hidden && currentId === id) {
-					await openLog(id);
+					await openLog(id as string);
 				}
 				toast(file ? "封面已更新" : "封面已移除");
 			}
